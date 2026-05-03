@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VaultCipher — AES-256-GCM + RSA-2048</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --vc-bg:#0a0c10;--vc-surface:#111318;--vc-surface2:#181c24;
+      --vc-accent:#00f5c4;--vc-accent2:#0ff;--vc-muted:#4a5568;
+      --vc-text:#e2e8f0;--vc-text2:#8899aa;--vc-border:#1e2533;
+      --vc-danger:#ff4757;--vc-success:#00f5c4;
+      --mono:'Share Tech Mono',monospace;--head:'Rajdhani',sans-serif;
+    }
+    body{background:var(--vc-bg);color:var(--vc-text);font-family:var(--mono);min-height:100vh}
+    .app{max-width:720px;margin:0 auto;padding:20px 16px 60px}
+    .brand{text-align:center;padding:36px 0 28px}
+    .brand-logo{font-family:var(--head);font-size:40px;font-weight:700;letter-spacing:8px;color:var(--vc-accent);text-transform:uppercase}
+    .brand-sub{font-size:11px;letter-spacing:3px;color:var(--vc-text2);margin-top:6px}
+    .brand-line{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--vc-accent),transparent);margin:18px 0}
+    .tabs{display:flex;gap:2px;background:var(--vc-surface);border:1px solid var(--vc-border);border-radius:6px;padding:3px;margin-bottom:20px}
+    .tab{flex:1;padding:9px 0;font-family:var(--head);font-size:13px;font-weight:600;letter-spacing:2px;text-align:center;color:var(--vc-text2);cursor:pointer;border-radius:4px;border:none;background:transparent;transition:all .2s}
+    .tab.active{background:var(--vc-accent);color:#0a0c10}
+    .tab:hover:not(.active){color:var(--vc-accent);background:rgba(0,245,196,.07)}
+    .panel{display:none}.panel.active{display:block}
+    .card{background:var(--vc-surface);border:1px solid var(--vc-border);border-radius:8px;padding:20px;margin-bottom:16px}
+    .card-title{font-family:var(--head);font-size:14px;font-weight:600;letter-spacing:2px;color:var(--vc-accent);margin-bottom:14px;text-transform:uppercase}
+    label{display:block;font-size:11px;letter-spacing:1.5px;color:var(--vc-text2);margin-bottom:6px}
+    textarea,input[type=text],input[type=password]{
+      width:100%;background:var(--vc-bg);border:1px solid var(--vc-border);color:var(--vc-text);
+      font-family:var(--mono);font-size:12px;padding:10px 12px;border-radius:5px;outline:none;
+      transition:border .2s;resize:vertical;
+    }
+    textarea:focus,input:focus{border-color:var(--vc-accent)}
+    textarea{min-height:80px}
+    .mb{margin-bottom:14px}
+    .btn-row{display:flex;gap:10px;margin-top:6px}
+    .btn{font-family:var(--head);font-weight:600;font-size:13px;letter-spacing:2px;padding:10px 20px;border:none;border-radius:5px;cursor:pointer;transition:all .15s;text-transform:uppercase}
+    .btn-primary{background:var(--vc-accent);color:#0a0c10}
+    .btn-primary:hover{filter:brightness(1.15)}
+    .btn-secondary{background:transparent;border:1px solid var(--vc-muted);color:var(--vc-text2)}
+    .btn-secondary:hover{border-color:var(--vc-accent);color:var(--vc-accent)}
+    .output-box{
+      background:var(--vc-bg);border:1px solid var(--vc-border);border-radius:5px;
+      padding:12px;font-size:11px;word-break:break-all;min-height:60px;
+      color:var(--vc-accent);line-height:1.6;position:relative;
+    }
+    .output-label{font-size:10px;letter-spacing:1.5px;color:var(--vc-text2);margin-bottom:6px}
+    .copy-btn{position:absolute;top:8px;right:8px;background:var(--vc-surface2);border:1px solid var(--vc-border);color:var(--vc-text2);font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:3px;cursor:pointer}
+    .copy-btn:hover{color:var(--vc-accent)}
+    .status{font-size:11px;letter-spacing:1px;padding:8px 12px;border-radius:4px;margin-top:10px;display:none}
+    .status.ok{background:rgba(0,245,196,.08);border:1px solid rgba(0,245,196,.25);color:var(--vc-success);display:block}
+    .status.err{background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.25);color:var(--vc-danger);display:block}
+    .seg{display:flex;gap:2px;background:var(--vc-bg);border:1px solid var(--vc-border);border-radius:5px;padding:3px;margin-bottom:14px}
+    .seg-btn{flex:1;padding:6px;font-family:var(--mono);font-size:11px;text-align:center;cursor:pointer;border-radius:3px;border:none;background:transparent;color:var(--vc-text2);transition:all .15s}
+    .seg-btn.active{background:var(--vc-surface2);color:var(--vc-accent);border:1px solid var(--vc-border)}
+    .divider{height:1px;background:var(--vc-border);margin:16px 0}
+    .hint{font-size:10px;color:var(--vc-muted);margin-top:5px;letter-spacing:.5px}
+    .badge{display:inline-block;font-size:9px;letter-spacing:1.5px;padding:2px 7px;border-radius:3px;text-transform:uppercase;font-family:var(--head);font-weight:600}
+    .badge-aes{background:rgba(0,245,196,.12);color:var(--vc-accent);border:1px solid rgba(0,245,196,.3)}
+    .badge-rsa{background:rgba(0,255,255,.1);color:var(--vc-accent2);border:1px solid rgba(0,255,255,.25)}
+    select{background:var(--vc-bg);border:1px solid var(--vc-border);color:var(--vc-text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:5px;outline:none;width:100%}
+    .key-display{background:var(--vc-bg);border:1px solid var(--vc-border);border-radius:5px;padding:12px;font-size:10px;color:var(--vc-accent2);word-break:break-all;line-height:1.7;max-height:140px;overflow-y:auto}
+    footer{text-align:center;margin-top:40px;font-size:10px;letter-spacing:2px;color:var(--vc-muted)}
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <div class="brand">
+    <div class="brand-logo">VaultCipher</div>
+    <div class="brand-sub">AES-256-GCM &middot; RSA-2048 &middot; CRYPTOGRAPHIC TOOLKIT</div>
+    <div class="brand-line"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('aes')">AES-256-GCM</button>
+    <button class="tab" onclick="switchTab('rsa')">RSA-2048</button>
+    <button class="tab" onclick="switchTab('about')">HOW IT WORKS</button>
+  </div>
+
+  <!-- AES Panel -->
+  <div id="panel-aes" class="panel active">
+    <div class="card">
+      <div class="card-title"><span class="badge badge-aes">AES</span> &nbsp;Symmetric Encryption</div>
+      <div class="seg">
+        <button class="seg-btn active" id="aes-mode-enc" onclick="setAesMode('encrypt')">ENCRYPT</button>
+        <button class="seg-btn" id="aes-mode-dec" onclick="setAesMode('decrypt')">DECRYPT</button>
+      </div>
+      <div id="aes-enc-ui">
+        <div class="mb">
+          <label>PLAINTEXT</label>
+          <textarea id="aes-plain" placeholder="Enter message to encrypt..."></textarea>
+        </div>
+        <div class="mb">
+          <label>PASSWORD</label>
+          <input type="password" id="aes-pass-enc" placeholder="Encryption password...">
+          <div class="hint">Key derived via PBKDF2-SHA256 (480k iterations)</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="aesEncrypt()">ENCRYPT</button>
+          <button class="btn btn-secondary" onclick="clearAes()">CLEAR</button>
+        </div>
+      </div>
+      <div id="aes-dec-ui" style="display:none">
+        <div class="mb">
+          <label>CIPHERTEXT (base64)</label>
+          <textarea id="aes-cipher" placeholder="Paste encrypted payload..."></textarea>
+        </div>
+        <div class="mb">
+          <label>PASSWORD</label>
+          <input type="password" id="aes-pass-dec" placeholder="Decryption password...">
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="aesDecrypt()">DECRYPT</button>
+          <button class="btn btn-secondary" onclick="clearAes()">CLEAR</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="aes-out-card" style="display:none">
+      <div class="output-label">OUTPUT</div>
+      <div class="output-box" id="aes-out">
+        <button class="copy-btn" onclick="copyOut('aes-out-text')">COPY</button>
+        <span id="aes-out-text"></span>
+      </div>
+      <div id="aes-status" class="status"></div>
+    </div>
+  </div>
+
+  <!-- RSA Panel -->
+  <div id="panel-rsa" class="panel">
+    <div class="card">
+      <div class="card-title"><span class="badge badge-rsa">RSA</span> &nbsp;Key Pair Generator</div>
+      <div class="mb">
+        <label>KEY SIZE</label>
+        <select id="rsa-bits">
+          <option value="2048">2048 bits (recommended)</option>
+          <option value="4096">4096 bits (paranoid mode)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="rsaGenKeys()">GENERATE KEY PAIR</button>
+      <div id="rsa-key-status" class="status"></div>
+    </div>
+    <div id="rsa-keys-card" class="card" style="display:none">
+      <div class="mb">
+        <div class="output-label">PUBLIC KEY (share this)</div>
+        <div class="key-display" id="rsa-pub"></div>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('rsa-pub').innerText)" style="margin-top:6px;font-size:11px;padding:5px 12px">COPY PUBLIC KEY</button>
+      </div>
+      <div class="divider"></div>
+      <div>
+        <div class="output-label">PRIVATE KEY (keep secret!)</div>
+        <div class="key-display" id="rsa-priv" style="color:var(--vc-danger)"></div>
+        <button class="btn btn-secondary" onclick="copyText(document.getElementById('rsa-priv').innerText)" style="margin-top:6px;font-size:11px;padding:5px 12px;border-color:var(--vc-danger);color:var(--vc-danger)">COPY PRIVATE KEY</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">RSA Encrypt / Decrypt</div>
+      <div class="seg">
+        <button class="seg-btn active" id="rsa-mode-enc" onclick="setRsaMode('encrypt')">ENCRYPT</button>
+        <button class="seg-btn" id="rsa-mode-dec" onclick="setRsaMode('decrypt')">DECRYPT</button>
+      </div>
+      <div id="rsa-enc-ui">
+        <div class="mb">
+          <label>MESSAGE</label>
+          <textarea id="rsa-plain" placeholder="Short message to encrypt..." style="min-height:60px"></textarea>
+          <div class="hint">RSA-OAEP limited to ~190 bytes for 2048-bit keys</div>
+        </div>
+        <div class="mb">
+          <label>PUBLIC KEY (PEM)</label>
+          <textarea id="rsa-pub-in" placeholder="Paste public key PEM here..." style="min-height:80px;color:#8899aa"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="rsaEncrypt()">ENCRYPT</button>
+      </div>
+      <div id="rsa-dec-ui" style="display:none">
+        <div class="mb">
+          <label>CIPHERTEXT (base64)</label>
+          <textarea id="rsa-cipher" placeholder="Paste RSA encrypted payload..." style="min-height:60px"></textarea>
+        </div>
+        <div class="mb">
+          <label>PRIVATE KEY (PEM)</label>
+          <textarea id="rsa-priv-in" placeholder="Paste private key PEM here..." style="min-height:80px;color:var(--vc-danger)"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="rsaDecrypt()">DECRYPT</button>
+      </div>
+      <div id="rsa-op-out" style="display:none;margin-top:14px">
+        <div class="output-label">OUTPUT</div>
+        <div class="output-box"><button class="copy-btn" onclick="copyOut('rsa-out-text')">COPY</button><span id="rsa-out-text"></span></div>
+        <div id="rsa-status" class="status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Panel -->
+  <div id="panel-about" class="panel">
+    <div class="card">
+      <div class="card-title">AES-256-GCM</div>
+      <p style="font-size:12px;color:var(--vc-text2);line-height:1.8">
+        Advanced Encryption Standard in Galois/Counter Mode. Symmetric cipher — same key encrypts and decrypts. Each operation generates a random 128-bit salt + 96-bit nonce. The password is stretched via PBKDF2-SHA256 (480,000 iterations) to produce a 256-bit key. GCM mode provides authenticated encryption — tampering is detected.
+      </p>
+      <div class="divider"></div>
+      <div style="font-size:11px;color:var(--vc-text2);line-height:2">
+        <div>Key size &nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent)">256 bits</span></div>
+        <div>Mode &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent)">GCM (authenticated)</span></div>
+        <div>KDF &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent)">PBKDF2-SHA256</span></div>
+        <div>Salt &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent)">16 bytes (random)</span></div>
+        <div>Nonce &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent)">12 bytes (random)</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">RSA-2048 / OAEP</div>
+      <p style="font-size:12px;color:var(--vc-text2);line-height:1.8">
+        Rivest–Shamir–Adleman asymmetric encryption. Two mathematically linked keys — public key encrypts, private key decrypts. Uses OAEP padding with SHA-256 for security. Suitable for encrypting small payloads or symmetric keys (hybrid encryption pattern).
+      </p>
+      <div class="divider"></div>
+      <div style="font-size:11px;color:var(--vc-text2);line-height:2">
+        <div>Key sizes &nbsp;&nbsp;→ <span style="color:var(--vc-accent2)">2048 / 4096 bits</span></div>
+        <div>Padding &nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent2)">OAEP-SHA256</span></div>
+        <div>Exponent &nbsp;&nbsp;→ <span style="color:var(--vc-accent2)">65537</span></div>
+        <div>Format &nbsp;&nbsp;&nbsp;&nbsp;→ <span style="color:var(--vc-accent2)">PEM (PKCS#1)</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">CLI USAGE</div>
+      <div style="font-size:11px;color:var(--vc-text2);line-height:2.2">
+        <div style="color:var(--vc-muted)"># Install dependency</div>
+        <div style="color:var(--vc-accent)">pip install cryptography</div>
+        <br>
+        <div style="color:var(--vc-muted)"># AES encrypt</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py aes-encrypt --text "secret" --password "mypass"</div>
+        <br>
+        <div style="color:var(--vc-muted)"># Generate RSA keys</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py rsa-keygen --bits 2048 --output ./keys</div>
+        <br>
+        <div style="color:var(--vc-muted)"># RSA encrypt</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py rsa-encrypt --text "hello" --pubkey ./keys/public_key.pem</div>
+        <br>
+        <div style="color:var(--vc-muted)"># RSA decrypt</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py rsa-decrypt --payload "BASE64..." --privkey ./keys/private_key.pem</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>VAULTCIPHER &mdash; BUILT FOR EDUCATIONAL USE &mdash; H8RSH100</footer>
+</div>
+
+<script src="forge.min.js"></script>
+<script>
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',['aes','rsa','about'][i]===t)});
+  document.querySelectorAll('.panel').forEach(el=>el.classList.remove('active'));
+  document.getElementById('panel-'+t).classList.add('active');
+}
+function setAesMode(m){
+  document.getElementById('aes-enc-ui').style.display=m==='encrypt'?'':'none';
+  document.getElementById('aes-dec-ui').style.display=m==='decrypt'?'':'none';
+  document.getElementById('aes-mode-enc').classList.toggle('active',m==='encrypt');
+  document.getElementById('aes-mode-dec').classList.toggle('active',m==='decrypt');
+  document.getElementById('aes-out-card').style.display='none';
+}
+function setRsaMode(m){
+  document.getElementById('rsa-enc-ui').style.display=m==='encrypt'?'':'none';
+  document.getElementById('rsa-dec-ui').style.display=m==='decrypt'?'':'none';
+  document.getElementById('rsa-mode-enc').classList.toggle('active',m==='encrypt');
+  document.getElementById('rsa-mode-dec').classList.toggle('active',m==='decrypt');
+  document.getElementById('rsa-op-out').style.display='none';
+}
+function clearAes(){
+  ['aes-plain','aes-pass-enc','aes-cipher','aes-pass-dec'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('aes-out-card').style.display='none';
+}
+function copyText(t){navigator.clipboard.writeText(t).catch(()=>{});}
+function copyOut(id){
+  const el=document.getElementById(id);
+  if(el) navigator.clipboard.writeText(el.innerText||el.textContent).catch(()=>{});
+}
+
+// ── AES via forge ──
+function aesEncrypt(){
+  const plain=document.getElementById('aes-plain').value.trim();
+  const pass=document.getElementById('aes-pass-enc').value;
+  if(!plain||!pass){showAesStatus('err','Fill in both fields.');return;}
+  try{
+    const salt=forge.random.getBytesSync(16);
+    const iv=forge.random.getBytesSync(12);
+    const key=forge.pkcs5.pbkdf2(pass,salt,480000,32,forge.md.sha256.create());
+    const cipher=forge.cipher.createCipher('AES-GCM',key);
+    cipher.start({iv});
+    cipher.update(forge.util.createBuffer(plain,'utf8'));
+    cipher.finish();
+    const ct=cipher.output.getBytes();
+    const tag=cipher.mode.tag.getBytes();
+    const payload=forge.util.encode64(salt+iv+ct+tag);
+    showOutput('aes-out-text','aes-out-card',payload);
+    showAesStatus('ok','Encrypted successfully.');
+  }catch(e){showAesStatus('err','Encryption failed: '+e.message);}
+}
+function aesDecrypt(){
+  const payload=document.getElementById('aes-cipher').value.trim();
+  const pass=document.getElementById('aes-pass-dec').value;
+  if(!payload||!pass){showAesStatus('err','Fill in both fields.');return;}
+  try{
+    const raw=forge.util.decode64(payload);
+    const salt=raw.slice(0,16);
+    const iv=raw.slice(16,28);
+    const ct=raw.slice(28,raw.length-16);
+    const tag=raw.slice(raw.length-16);
+    const key=forge.pkcs5.pbkdf2(pass,salt,480000,32,forge.md.sha256.create());
+    const decipher=forge.cipher.createDecipher('AES-GCM',key);
+    decipher.start({iv,tag:forge.util.createBuffer(tag)});
+    decipher.update(forge.util.createBuffer(ct));
+    const ok=decipher.finish();
+    if(!ok){showAesStatus('err','Authentication failed. Wrong password or corrupted data.');return;}
+    showOutput('aes-out-text','aes-out-card',decipher.output.toString('utf8'));
+    showAesStatus('ok','Decrypted successfully.');
+  }catch(e){showAesStatus('err','Decryption failed. Wrong password or bad payload.');}
+}
+function showOutput(textId,cardId,val){
+  document.getElementById(textId).textContent=val;
+  document.getElementById(cardId).style.display='block';
+}
+function showAesStatus(type,msg){
+  const el=document.getElementById('aes-status');
+  el.className='status '+type;el.textContent=msg;
+}
+
+// ── RSA via forge ──
+function rsaGenKeys(){
+  const bits=parseInt(document.getElementById('rsa-bits').value);
+  const st=document.getElementById('rsa-key-status');
+  st.className='status ok';st.textContent='Generating '+bits+'-bit key pair... (may take a few seconds)';
+  setTimeout(()=>{
+    try{
+      const kp=forge.pki.rsa.generateKeyPair({bits,e:0x10001});
+      const pub=forge.pki.publicKeyToPem(kp.publicKey);
+      const priv=forge.pki.privateKeyToPem(kp.privateKey);
+      document.getElementById('rsa-pub').textContent=pub;
+      document.getElementById('rsa-priv').textContent=priv;
+      document.getElementById('rsa-pub-in').value=pub;
+      document.getElementById('rsa-priv-in').value=priv;
+      document.getElementById('rsa-keys-card').style.display='block';
+      st.textContent='Key pair generated. Never share your private key!';
+    }catch(e){
+      st.className='status err';st.textContent='Key generation failed: '+e.message;
+    }
+  },50);
+}
+function rsaEncrypt(){
+  const plain=document.getElementById('rsa-plain').value.trim();
+  const pubPem=document.getElementById('rsa-pub-in').value.trim();
+  if(!plain||!pubPem){showRsaStatus('err','Fill in message and public key.');return;}
+  try{
+    const pub=forge.pki.publicKeyFromPem(pubPem);
+    const ct=pub.encrypt(plain,'RSA-OAEP',{md:forge.md.sha256.create(),mgf1:{md:forge.md.sha256.create()}});
+    document.getElementById('rsa-out-text').textContent=forge.util.encode64(ct);
+    document.getElementById('rsa-op-out').style.display='block';
+    showRsaStatus('ok','RSA encrypted successfully.');
+  }catch(e){showRsaStatus('err','RSA encryption failed: '+e.message);}
+}
+function rsaDecrypt(){
+  const payload=document.getElementById('rsa-cipher').value.trim();
+  const privPem=document.getElementById('rsa-priv-in').value.trim();
+  if(!payload||!privPem){showRsaStatus('err','Fill in ciphertext and private key.');return;}
+  try{
+    const priv=forge.pki.privateKeyFromPem(privPem);
+    const ct=forge.util.decode64(payload);
+    const plain=priv.decrypt(ct,'RSA-OAEP',{md:forge.md.sha256.create(),mgf1:{md:forge.md.sha256.create()}});
+    document.getElementById('rsa-out-text').textContent=plain;
+    document.getElementById('rsa-op-out').style.display='block';
+    showRsaStatus('ok','RSA decrypted successfully.');
+  }catch(e){showRsaStatus('err','RSA decryption failed. Wrong key or corrupt payload.');}
+}
+function showRsaStatus(type,msg){
+  const el=document.getElementById('rsa-status');
+  el.className='status '+type;el.textContent=msg;
+}
+</script>
+</body>
+</html>
