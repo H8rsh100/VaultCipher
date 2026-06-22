@@ -1,10 +1,10 @@
 # 🔐 VaultCipher
 
-> **AES-256-GCM + RSA-2048 Cryptographic Toolkit**  
+> **AES-256-GCM + RSA-2048 + SHA Hashing + Digital Signatures**  
 > Python CLI + Offline Browser UI — No server. No cloud. Pure cryptography.
 
 ![Made with Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
-![Crypto](https://img.shields.io/badge/Crypto-AES--256--GCM%20%7C%20RSA--2048-00f5c4?style=flat)
+![Crypto](https://img.shields.io/badge/Crypto-AES--256--GCM%20%7C%20RSA--2048%20%7C%20SHA-00f5c4?style=flat)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat)
 
@@ -12,13 +12,16 @@
 
 ## 📌 What is VaultCipher?
 
-VaultCipher is a cryptographic toolkit that lets you **encrypt and decrypt messages** using two of the most battle-tested encryption algorithms in the world:
+VaultCipher is a comprehensive cryptographic toolkit that lets you **encrypt, decrypt, hash, sign, and verify** using battle-tested algorithms:
 
-- **AES-256-GCM** — The symmetric cipher used by governments, banks, and apps like WhatsApp
-- **RSA-2048** — The asymmetric cipher behind HTTPS, SSH, and secure internet communication
+- **AES-256-GCM** — Symmetric authenticated encryption used by governments and banks
+- **RSA-2048/4096** — Asymmetric encryption behind HTTPS, SSH, and secure communications
+- **RSA-PSS** — Digital signatures for message authentication and non-repudiation
+- **SHA-256/384/512** — Cryptographic hashing for integrity verification
+- **Password Strength Analysis** — Entropy-based password scoring with pattern detection
 
 It comes with two interfaces:
-- A **Python CLI** for terminal-based encryption
+- A **Python CLI** for terminal-based cryptographic operations
 - A **fully offline Browser UI** — open `index.html` and it just works, no internet required
 
 > ⚠️ Built for **educational purposes**. Demonstrates real cryptographic principles used in production systems.
@@ -32,6 +35,8 @@ VaultCipher/
 ├── index.html            # Web UI (open in any browser)
 ├── forge.min.js          # Crypto library for browser (offline)
 ├── vaultcipher_cli.py    # Python CLI tool
+├── requirements.txt      # Python dependencies
+├── SECURITY.md           # Security policy & best practices
 ├── keys/                 # Generated RSA key pairs (gitignored)
 │   ├── private_key.pem
 │   └── public_key.pem
@@ -47,13 +52,11 @@ VaultCipher/
 - Python 3.8+
 - pip
 
-### Install dependency
+### Install dependencies
 
 ```bash
-pip install cryptography
+pip install -r requirements.txt
 ```
-
-That's it. No virtual environment needed, no `package.json`, no build step.
 
 ---
 
@@ -93,15 +96,69 @@ python vaultcipher_cli.py rsa-decrypt --payload "BASE64_CIPHERTEXT_HERE" --privk
 
 ---
 
+### ✍️ RSA-PSS — Digital Signatures
+
+**Sign a message:**
+```bash
+python vaultcipher_cli.py rsa-sign --message "I approve this transaction" --privkey ./keys/private_key.pem
+```
+
+**Verify a signature:**
+```bash
+python vaultcipher_cli.py rsa-verify --message "I approve this transaction" --signature "BASE64_SIG" --pubkey ./keys/public_key.pem
+```
+
+> Digital signatures prove that a message was created by a known sender and was not altered in transit.
+
+---
+
+### 🔑 SHA Hashing
+
+**Hash text (SHA-256 by default):**
+```bash
+python vaultcipher_cli.py hash-text --text "hello world"
+```
+
+**Hash with a different algorithm:**
+```bash
+python vaultcipher_cli.py hash-text --text "hello world" --algorithm sha512
+```
+
+**Hash a file (streaming, memory-efficient):**
+```bash
+python vaultcipher_cli.py hash-file --file ./README.md --algorithm sha256
+```
+
+> Supported algorithms: `sha256`, `sha384`, `sha512`, `md5`
+
+---
+
+### 🔒 Password Strength Analysis
+
+```bash
+python vaultcipher_cli.py password-strength --password "MyS3cur3P@ssw0rd!"
+```
+
+Output includes:
+- Score (0–100) with visual bar
+- Rating (CRITICAL / WEAK / FAIR / GOOD / STRONG)
+- Entropy estimation in bits
+- Actionable feedback on how to improve
+
+---
+
 ## 🌐 Web UI Usage
 
 1. Make sure `index.html` and `forge.min.js` are in the **same folder**
 2. Double-click `index.html` to open in your browser
 3. No internet connection required — everything runs locally
 
-**AES Tab** — Type your message + password → hit ENCRYPT → copy the output  
-**RSA Tab** — Generate a key pair → encrypt with public key → decrypt with private key  
-**How It Works Tab** — Learn about the cryptographic concepts behind the tool
+| Tab | Features |
+|-----|----------|
+| **AES** | Encrypt/decrypt with password + live strength meter |
+| **RSA** | Generate keys, encrypt/decrypt, sign/verify messages |
+| **HASHING** | SHA-256/384/512/SHA-1 digest computation |
+| **HOW IT WORKS** | Cryptographic concepts explained |
 
 ---
 
@@ -153,6 +210,37 @@ RSA uses a mathematically linked key pair. What the public key encrypts, only th
 
 ---
 
+### RSA-PSS (Digital Signatures)
+
+RSA-PSS (Probabilistic Signature Scheme) provides **authentication** and **non-repudiation**:
+
+| Parameter | Value |
+|-----------|-------|
+| Scheme | PSS (Probabilistic Signature Scheme) |
+| Hash | SHA-256 |
+| Salt Length | Maximum |
+| Use Case | Message authentication, code signing |
+
+**How it works:**
+1. Hash the message with SHA-256
+2. Sign the hash with the private key using PSS padding
+3. Anyone with the public key can verify the signature
+4. If the message is altered, verification fails
+
+---
+
+### Cryptographic Hashing (SHA)
+
+| Algorithm | Digest Size | Status |
+|-----------|-------------|--------|
+| SHA-256 | 256 bits (64 hex chars) | ✅ Recommended |
+| SHA-384 | 384 bits (96 hex chars) | ✅ Secure |
+| SHA-512 | 512 bits (128 hex chars) | ✅ Secure |
+| SHA-1 | 160 bits (40 hex chars) | ⚠️ Legacy |
+| MD5 | 128 bits (32 hex chars) | ❌ Broken |
+
+---
+
 ## 🛡️ Security Concepts Covered
 
 | Concept | Description |
@@ -162,8 +250,11 @@ RSA uses a mathematically linked key pair. What the public key encrypts, only th
 | **PBKDF2** | Deliberately slow key derivation — makes brute-force attacks expensive |
 | **Authenticated Encryption** | GCM's auth tag detects any tampering with ciphertext |
 | **Public/Private Key Pair** | Foundation of all modern secure communication |
+| **Digital Signatures** | RSA-PSS proves message authenticity and detects tampering |
 | **PEM Format** | Standard text format for storing and sharing RSA keys |
 | **OAEP Padding** | Secure padding scheme that hardens RSA against known attacks |
+| **PSS Padding** | Probabilistic signature padding — more secure than PKCS#1 v1.5 |
+| **Entropy** | Measure of randomness/unpredictability in a password or key |
 
 ---
 
@@ -171,7 +262,7 @@ RSA uses a mathematically linked key pair. What the public key encrypts, only th
 
 | Tool | Purpose |
 |------|---------|
-| `cryptography` (Python) | AES-GCM, RSA, PBKDF2 for CLI |
+| `cryptography` (Python) | AES-GCM, RSA, PBKDF2, PSS signatures for CLI |
 | `forge.min.js` (Browser) | Full crypto library for offline web UI |
 
 ---
@@ -182,6 +273,7 @@ RSA uses a mathematically linked key pair. What the public key encrypts, only th
 - RSA is limited to ~190 bytes per encryption with 2048-bit keys — use AES for large data
 - This project is for **educational use** — for production systems, use established libraries and follow security auditing practices
 - All cryptographic operations run **locally** — no data is sent anywhere
+- See [SECURITY.md](SECURITY.md) for detailed security best practices
 
 ---
 
