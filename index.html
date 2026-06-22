@@ -203,6 +203,44 @@
         <div id="rsa-status" class="status"></div>
       </div>
     </div>
+    <div class="card">
+      <div class="card-title"><span class="badge badge-rsa">SIG</span> &nbsp;Digital Signatures (RSA-PSS)</div>
+      <div class="seg">
+        <button class="seg-btn active" id="sig-mode-sign" onclick="setSigMode('sign')">SIGN</button>
+        <button class="seg-btn" id="sig-mode-verify" onclick="setSigMode('verify')">VERIFY</button>
+      </div>
+      <div id="sig-sign-ui">
+        <div class="mb">
+          <label>MESSAGE TO SIGN</label>
+          <textarea id="sig-message" placeholder="Enter message to sign..." style="min-height:60px"></textarea>
+        </div>
+        <div class="mb">
+          <label>PRIVATE KEY (PEM)</label>
+          <textarea id="sig-privkey" placeholder="Paste private key PEM here..." style="min-height:80px;color:var(--vc-danger)"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="rsaSign()">SIGN MESSAGE</button>
+      </div>
+      <div id="sig-verify-ui" style="display:none">
+        <div class="mb">
+          <label>ORIGINAL MESSAGE</label>
+          <textarea id="sig-verify-msg" placeholder="Enter original message..." style="min-height:60px"></textarea>
+        </div>
+        <div class="mb">
+          <label>SIGNATURE (base64)</label>
+          <textarea id="sig-verify-sig" placeholder="Paste base64 signature..." style="min-height:60px"></textarea>
+        </div>
+        <div class="mb">
+          <label>PUBLIC KEY (PEM)</label>
+          <textarea id="sig-verify-pubkey" placeholder="Paste public key PEM here..." style="min-height:80px;color:#8899aa"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="rsaVerify()">VERIFY SIGNATURE</button>
+      </div>
+      <div id="sig-out" style="display:none;margin-top:14px">
+        <div class="output-label">SIGNATURE OUTPUT</div>
+        <div class="output-box"><button class="copy-btn" onclick="copyOut('sig-out-text')">COPY</button><span id="sig-out-text"></span></div>
+        <div id="sig-status" class="status"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Hash Panel -->
@@ -426,6 +464,57 @@ function rsaDecrypt(){
 }
 function showRsaStatus(type,msg){
   const el=document.getElementById('rsa-status');
+  el.className='status '+type;el.textContent=msg;
+}
+
+// ── Digital Signatures via forge ──
+function setSigMode(m){
+  document.getElementById('sig-sign-ui').style.display=m==='sign'?'':'none';
+  document.getElementById('sig-verify-ui').style.display=m==='verify'?'':'none';
+  document.getElementById('sig-mode-sign').classList.toggle('active',m==='sign');
+  document.getElementById('sig-mode-verify').classList.toggle('active',m==='verify');
+  document.getElementById('sig-out').style.display='none';
+}
+function rsaSign(){
+  const msg=document.getElementById('sig-message').value.trim();
+  const privPem=document.getElementById('sig-privkey').value.trim() || document.getElementById('rsa-priv-in').value.trim();
+  if(!msg||!privPem){showSigStatus('err','Fill in message and private key.');return;}
+  try{
+    const priv=forge.pki.privateKeyFromPem(privPem);
+    const md=forge.md.sha256.create();
+    md.update(msg,'utf8');
+    const pss=forge.pss.create({md:forge.md.sha256.create(),mgf:forge.mgf.mgf1.create(forge.md.sha256.create()),saltLength:20});
+    const sig=priv.sign(md,pss);
+    const b64=forge.util.encode64(sig);
+    document.getElementById('sig-out-text').textContent=b64;
+    document.getElementById('sig-out').style.display='block';
+    showSigStatus('ok','Message signed successfully (RSA-PSS + SHA-256).');
+  }catch(e){showSigStatus('err','Signing failed: '+e.message);}
+}
+function rsaVerify(){
+  const msg=document.getElementById('sig-verify-msg').value.trim();
+  const sigB64=document.getElementById('sig-verify-sig').value.trim();
+  const pubPem=document.getElementById('sig-verify-pubkey').value.trim() || document.getElementById('rsa-pub-in').value.trim();
+  if(!msg||!sigB64||!pubPem){showSigStatus('err','Fill in all fields.');return;}
+  try{
+    const pub=forge.pki.publicKeyFromPem(pubPem);
+    const md=forge.md.sha256.create();
+    md.update(msg,'utf8');
+    const sig=forge.util.decode64(sigB64);
+    const pss=forge.pss.create({md:forge.md.sha256.create(),mgf:forge.mgf.mgf1.create(forge.md.sha256.create()),saltLength:20});
+    const valid=pub.verify(md.digest().bytes(),sig,pss);
+    if(valid){
+      showSigStatus('ok','✅ Signature is VALID — message is authentic and untampered.');
+      document.getElementById('sig-out-text').textContent='VALID — Signature verified successfully.';
+    }else{
+      showSigStatus('err','❌ Signature is INVALID — message may have been tampered with.');
+      document.getElementById('sig-out-text').textContent='INVALID';
+    }
+    document.getElementById('sig-out').style.display='block';
+  }catch(e){showSigStatus('err','Verification failed: '+e.message);}
+}
+function showSigStatus(type,msg){
+  const el=document.getElementById('sig-status');
   el.className='status '+type;el.textContent=msg;
 }
 

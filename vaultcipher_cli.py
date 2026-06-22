@@ -139,6 +139,41 @@ def rsa_decrypt(payload: str, priv_key_path: str) -> str:
     return plaintext.decode()
 
 
+def rsa_sign(message: str, priv_key_path: str) -> str:
+    """Sign a message using RSA-PSS with SHA-256. Returns base64-encoded signature."""
+    with open(priv_key_path, "rb") as f:
+        private_key = serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
+    signature = private_key.sign(
+        message.encode(),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return base64.b64encode(signature).decode()
+
+
+def rsa_verify(message: str, signature_b64: str, pub_key_path: str) -> bool:
+    """Verify an RSA-PSS signature. Returns True if valid, raises on failure."""
+    with open(pub_key_path, "rb") as f:
+        public_key = serialization.load_pem_public_key(f.read(), backend=default_backend())
+    sig_bytes = base64.b64decode(signature_b64.encode())
+    try:
+        public_key.verify(
+            sig_bytes,
+            message.encode(),
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return True
+    except Exception:
+        return False
+
+
 # ─────────────────────────────────────────
 # Hashing Utilities
 # ─────────────────────────────────────────
@@ -293,6 +328,25 @@ def cmd_rsa_decrypt(args):
         print(f"\n❌ RSA Decryption failed: {e}\n")
 
 
+def cmd_rsa_sign(args):
+    try:
+        sig = rsa_sign(args.message, args.privkey)
+        print(f"\n✍️  RSA-PSS Signature:\n{sig}\n")
+    except Exception as e:
+        print(f"\n❌ Signing failed: {e}\n")
+
+
+def cmd_rsa_verify(args):
+    try:
+        valid = rsa_verify(args.message, args.signature, args.pubkey)
+        if valid:
+            print(f"\n✅ Signature is VALID — message is authentic and untampered.\n")
+        else:
+            print(f"\n❌ Signature is INVALID — message may have been tampered with.\n")
+    except Exception as e:
+        print(f"\n❌ Verification failed: {e}\n")
+
+
 def cmd_hash_text(args):
     digest = hash_text(args.text, args.algorithm)
     print(f"\n🔑 {args.algorithm.upper()} Hash:\n{digest}\n")
@@ -382,6 +436,19 @@ def main():
     p8 = sub.add_parser("password-strength", help="Analyze password strength")
     p8.add_argument("--password", required=True, help="Password to analyze")
     p8.set_defaults(func=cmd_password_strength)
+
+    # rsa-sign
+    p9 = sub.add_parser("rsa-sign", help="Sign a message with RSA-PSS")
+    p9.add_argument("--message", required=True, help="Message to sign")
+    p9.add_argument("--privkey", required=True, help="Path to private key PEM file")
+    p9.set_defaults(func=cmd_rsa_sign)
+
+    # rsa-verify
+    p10 = sub.add_parser("rsa-verify", help="Verify an RSA-PSS signature")
+    p10.add_argument("--message", required=True, help="Original message")
+    p10.add_argument("--signature", required=True, help="Base64-encoded signature")
+    p10.add_argument("--pubkey", required=True, help="Path to public key PEM file")
+    p10.set_defaults(func=cmd_rsa_verify)
 
     args = parser.parse_args()
     args.func(args)
