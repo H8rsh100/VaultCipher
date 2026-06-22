@@ -62,9 +62,15 @@
     .badge{display:inline-block;font-size:9px;letter-spacing:1.5px;padding:2px 7px;border-radius:3px;text-transform:uppercase;font-family:var(--head);font-weight:600}
     .badge-aes{background:rgba(0,245,196,.12);color:var(--vc-accent);border:1px solid rgba(0,245,196,.3)}
     .badge-rsa{background:rgba(0,255,255,.1);color:var(--vc-accent2);border:1px solid rgba(0,255,255,.25)}
+    .badge-hash{background:rgba(255,165,0,.12);color:#ffa500;border:1px solid rgba(255,165,0,.3)}
     select{background:var(--vc-bg);border:1px solid var(--vc-border);color:var(--vc-text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:5px;outline:none;width:100%}
     .key-display{background:var(--vc-bg);border:1px solid var(--vc-border);border-radius:5px;padding:12px;font-size:10px;color:var(--vc-accent2);word-break:break-all;line-height:1.7;max-height:140px;overflow-y:auto}
     footer{text-align:center;margin-top:40px;font-size:10px;letter-spacing:2px;color:var(--vc-muted)}
+    /* Password strength meter */
+    .pw-meter{margin-top:8px}
+    .pw-meter-bar{height:4px;border-radius:2px;background:var(--vc-border);overflow:hidden;margin-bottom:4px}
+    .pw-meter-fill{height:100%;border-radius:2px;transition:width .3s ease,background .3s ease;width:0}
+    .pw-meter-label{font-size:9px;letter-spacing:1.5px;font-family:var(--head);font-weight:600}
   </style>
 </head>
 <body>
@@ -79,6 +85,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('aes')">AES-256-GCM</button>
     <button class="tab" onclick="switchTab('rsa')">RSA-2048</button>
+    <button class="tab" onclick="switchTab('hash')">HASHING</button>
     <button class="tab" onclick="switchTab('about')">HOW IT WORKS</button>
   </div>
 
@@ -97,7 +104,11 @@
         </div>
         <div class="mb">
           <label>PASSWORD</label>
-          <input type="password" id="aes-pass-enc" placeholder="Encryption password...">
+          <input type="password" id="aes-pass-enc" placeholder="Encryption password..." oninput="updatePwMeter(this.value,'pw-meter-enc')">
+          <div class="pw-meter" id="pw-meter-enc">
+            <div class="pw-meter-bar"><div class="pw-meter-fill" id="pw-meter-enc-fill"></div></div>
+            <div class="pw-meter-label" id="pw-meter-enc-label" style="color:var(--vc-muted)"></div>
+          </div>
           <div class="hint">Key derived via PBKDF2-SHA256 (480k iterations)</div>
         </div>
         <div class="btn-row">
@@ -194,6 +205,46 @@
     </div>
   </div>
 
+  <!-- Hash Panel -->
+  <div id="panel-hash" class="panel">
+    <div class="card">
+      <div class="card-title"><span class="badge badge-hash">SHA</span> &nbsp;Hash Generator</div>
+      <div class="mb">
+        <label>ALGORITHM</label>
+        <select id="hash-algo">
+          <option value="SHA-256">SHA-256 (recommended)</option>
+          <option value="SHA-512">SHA-512</option>
+          <option value="SHA-384">SHA-384</option>
+          <option value="SHA-1">SHA-1 (legacy, not secure)</option>
+        </select>
+      </div>
+      <div class="mb">
+        <label>INPUT TEXT</label>
+        <textarea id="hash-input" placeholder="Enter text to hash..."></textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="computeHash()">COMPUTE HASH</button>
+        <button class="btn btn-secondary" onclick="clearHash()">CLEAR</button>
+      </div>
+    </div>
+    <div class="card" id="hash-out-card" style="display:none">
+      <div class="output-label">HASH DIGEST</div>
+      <div class="output-box" id="hash-out">
+        <button class="copy-btn" onclick="copyOut('hash-out-text')">COPY</button>
+        <span id="hash-out-text"></span>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--vc-text2);letter-spacing:1px">
+        <span id="hash-meta"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">About Hashing</div>
+      <p style="font-size:12px;color:var(--vc-text2);line-height:1.8">
+        A cryptographic hash function maps arbitrary data to a fixed-size digest. It is <strong>one-way</strong> — you cannot reverse a hash to get the original data. Even a single-bit change in the input produces a completely different hash (avalanche effect). Hashes are used for password storage, file integrity verification, digital signatures, and blockchain.
+      </p>
+    </div>
+  </div>
+
   <!-- About Panel -->
   <div id="panel-about" class="panel">
     <div class="card">
@@ -250,7 +301,7 @@
 <script src="forge.min.js"></script>
 <script>
 function switchTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',['aes','rsa','about'][i]===t)});
+  document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',['aes','rsa','hash','about'][i]===t)});
   document.querySelectorAll('.panel').forEach(el=>el.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
 }
@@ -376,6 +427,56 @@ function rsaDecrypt(){
 function showRsaStatus(type,msg){
   const el=document.getElementById('rsa-status');
   el.className='status '+type;el.textContent=msg;
+}
+
+// ── Hashing via forge ──
+async function computeHash(){
+  const input=document.getElementById('hash-input').value;
+  const algo=document.getElementById('hash-algo').value;
+  if(!input){return;}
+  try{
+    let md;
+    switch(algo){
+      case 'SHA-256': md=forge.md.sha256.create(); break;
+      case 'SHA-512': md=forge.md.sha512.create(); break;
+      case 'SHA-384': md=forge.md.sha384.create(); break;
+      case 'SHA-1': md=forge.md.sha1.create(); break;
+    }
+    md.update(input,'utf8');
+    const digest=md.digest().toHex();
+    document.getElementById('hash-out-text').textContent=digest;
+    document.getElementById('hash-out-card').style.display='block';
+    document.getElementById('hash-meta').textContent=algo+' · '+digest.length+' hex chars · '+(digest.length*4)+' bits';
+  }catch(e){console.error(e);}
+}
+function clearHash(){
+  document.getElementById('hash-input').value='';
+  document.getElementById('hash-out-card').style.display='none';
+}
+
+// ── Password Strength Meter ──
+function updatePwMeter(pw, meterId){
+  const fill=document.getElementById(meterId+'-fill');
+  const label=document.getElementById(meterId+'-label');
+  if(!pw){fill.style.width='0';label.textContent='';return;}
+  let score=0;
+  if(pw.length>=16) score+=30; else if(pw.length>=12) score+=25; else if(pw.length>=8) score+=15; else if(pw.length>=6) score+=8;
+  let cls=0;
+  if(/[a-z]/.test(pw)) cls++; if(/[A-Z]/.test(pw)) cls++; if(/[0-9]/.test(pw)) cls++; if(/[^a-zA-Z0-9]/.test(pw)) cls++;
+  score+=cls*7;
+  let cs=0;
+  if(/[a-z]/.test(pw)) cs+=26; if(/[A-Z]/.test(pw)) cs+=26; if(/[0-9]/.test(pw)) cs+=10; if(/[^a-zA-Z0-9]/.test(pw)) cs+=32;
+  if(cs>0){const e=pw.length*Math.log2(cs); if(e>=60) score+=25; else if(e>=40) score+=15; else if(e>=28) score+=8;}
+  if(/^(password|123456|qwerty|admin)/i.test(pw)) score-=5;
+  score=Math.max(0,Math.min(100,score));
+  let color,rating;
+  if(score>=80){color='#00f5c4';rating='STRONG';}
+  else if(score>=60){color='#6bff6b';rating='GOOD';}
+  else if(score>=40){color='#ffa500';rating='FAIR';}
+  else if(score>=20){color='#ff6b6b';rating='WEAK';}
+  else{color='#ff4757';rating='CRITICAL';}
+  fill.style.width=score+'%';fill.style.background=color;
+  label.textContent=rating+' ('+score+'/100)';label.style.color=color;
 }
 </script>
 </body>
