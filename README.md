@@ -19,6 +19,8 @@ VaultCipher is a comprehensive cryptographic toolkit that lets you **encrypt, de
 - **RSA-PSS** — Digital signatures for message authentication and non-repudiation
 - **SHA-256/384/512** — Cryptographic hashing for integrity verification
 - **Password Strength Analysis** — Entropy-based password scoring with pattern detection
+- **IoT Device Authentication** — Registers unique device IDs with RSA keys and cryptographically gates decrypted payloads to target devices
+- **IoT Sensor Integrity Chain** — Chronological, tamper-evident hash-chained sensor logging signed via RSA-PSS to prevent telemetry injection or modification
 
 It comes with two interfaces:
 - A **Python CLI** for terminal-based cryptographic operations
@@ -147,6 +149,45 @@ Output includes:
 
 ---
 
+### 📡 IoT Device Authentication & Sensor Data Integrity Chain
+
+Secures sensor readings locally using device-linked keypairs, hybrid authenticated encryption, and tamper-evident blockchain-style hash chains.
+
+#### 1. Device Identity Registration
+Register a virtual IoT device (creates a dedicated RSA keypair and local signed JSON certificate in `devices/<device_id>/`):
+```bash
+python vaultcipher_cli.py device-register --device-id "sensor-42"
+```
+
+#### 2. Device-Bound Encrypt & Decrypt
+Encrypt data specifically for `sensor-42`. Decryption will fail if attempted by any other device ID (enforcing access control):
+```bash
+# Encrypt data locked to a specific device ID
+python vaultcipher_cli.py device-encrypt --text "temp=22.5,humidity=60" --device-id "sensor-42"
+
+# Decrypt using the authorized device ID (success case)
+python vaultcipher_cli.py device-decrypt --payload "ENCRYPTED_PAYLOAD" --device-id "sensor-42"
+
+# Decrypt using an unauthorized device ID (fails instantly with ACCESS DENIED)
+python vaultcipher_cli.py device-decrypt --payload "ENCRYPTED_PAYLOAD" --device-id "hacker-99"
+```
+
+#### 3. Tamper-Evident Sensor Chain
+Build a sequential, hash-linked cryptographically signed ledger for sensor telemetry. Any alteration to historical blocks instantly breaks the chain verification.
+```bash
+# Initialize the chain (generates Block 0 Genesis)
+python vaultcipher_cli.py sensor-init --device-id "sensor-42"
+
+# Push new readings to the chain (automatically signed via RSA-PSS and linked to prev_hash)
+python vaultcipher_cli.py sensor-push --device-id "sensor-42" --reading "temp=22.5"
+python vaultcipher_cli.py sensor-push --device-id "sensor-42" --reading "temp=22.8"
+
+# Verify chain integrity (verifies all hashes, prev_hash links, indices, and signatures)
+python vaultcipher_cli.py sensor-verify --device-id "sensor-42"
+```
+
+---
+
 ## 🌐 Web UI Usage
 
 1. Make sure `index.html` and `forge.min.js` are in the **same folder**
@@ -238,6 +279,24 @@ RSA-PSS (Probabilistic Signature Scheme) provides **authentication** and **non-r
 | SHA-512 | 512 bits (128 hex chars) | ✅ Secure |
 | SHA-1 | 160 bits (40 hex chars) | ⚠️ Legacy |
 | MD5 | 128 bits (32 hex chars) | ❌ Broken |
+
+---
+
+### 📡 Device-Bound Hybrid Encryption (IoT)
+
+Combines asymmetric (RSA-OAEP) and symmetric (AES-GCM) cryptography to lock payloads to a specific device. 
+
+- **The Identity Gate**: The target device ID is packed into a length-prefixed header. Upon reception, the gateway compares this ID to the local device ID. If they mismatch, the process is aborted prior to key decryption.
+- **Destination Verification**: The device ID is also passed as Additional Authenticated Data (AAD) to the AES-GCM engine. This guarantees that an attacker cannot alter the target device ID header field without causing GCM tag validation to fail.
+
+---
+
+### ⛓️ IoT Sensor Integrity Chain (Blockchain-style Ledger)
+
+A sequential, tamper-evident ledger for recording sensor readings. 
+
+- **Sequential Hashing**: Each reading block stores the hash of the preceding block (`prev_hash`). The hash of the block itself is computed by serializing the JSON keys in alphabetical order, explicitly excluding the `hash` and `signature` fields to prevent circular dependency errors.
+- **Cryptographic Signatures**: The device signs the block hash using its private RSA key via RSA-PSS padding. During verification, the chain validator recomputes all hashes and checks all signatures against the device's public key, instantly flagging any historical modification.
 
 ---
 
