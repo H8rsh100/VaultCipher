@@ -2,6 +2,7 @@
 """
 VaultCipher CLI - Cryptographic Toolkit
 Features: AES-256-GCM | RSA-2048 | SHA Hashing | Password Strength Analysis
+          IoT Device Authentication | Sensor Data Integrity Chains
 Usage: python vaultcipher_cli.py [command] [options]
 
 Requirements:
@@ -11,11 +12,14 @@ Requirements:
 import argparse
 import base64
 import hashlib
+import json
 import math
 import os
 import re
 import string
+import struct
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # --- AES (via cryptography library) ---
@@ -25,11 +29,16 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.backends import default_backend
 
+# Ensure UTF-8 output on Windows
+if sys.platform == "win32":
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+
 BANNER = """
-╔══════════════════════════════════════════╗
-║          V A U L T C I P H E R          ║
-║   AES-256 · RSA-2048 · SHA · Toolkit    ║
-╚══════════════════════════════════════════╝
++==========================================+
+|          V A U L T C I P H E R          |
+|   AES-256 . RSA-2048 . SHA . IoT Auth   |
++==========================================+
 """
 
 # ─────────────────────────────────────────
@@ -292,6 +301,304 @@ def analyze_password(password: str) -> dict:
 
 
 # ─────────────────────────────────────────
+# IoT Device Authentication
+# ─────────────────────────────────────────
+
+DEVICES_DIR = Path("devices")
+
+
+def _device_dir(device_id: str) -> Path:
+    """Return the storage directory for a given device."""
+    return DEVICES_DIR / device_id
+
+
+def device_register(device_id: str, key_size: int = 2048) -> dict:
+    """
+    Register an IoT device: generate RSA keypair bound to the device ID
+    and issue a signed device certificate.
+    """
+    dev_dir = _device_dir(device_id)
+    dev_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate device-specific RSA keypair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=key_size, backend=default_backend()
+    )
+    public_key = private_key.public_key()
+
+    # Save keys
+    priv_path = dev_dir / "private_key.pem"
+    pub_path = dev_dir / "public_key.pem"
+    with open(priv_path, "wb") as f:
+        f.write(private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption()
+        ))
+    with open(pub_path, "wb") as f:
+        f.write(public_key.public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo
+        ))
+
+    # Compute public key fingerprint
+    pub_der = public_key.public_bytes(
+        serialization.Encoding.DER,
+        serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    fingerprint = "SHA256:" + hashlib.sha256(pub_der).hexdigest()
+
+    # Build and sign the device certificate
+    issued_at = datetime.now(timezone.utc).isoformat()
+    cert_data = f"{device_id}|{fingerprint}|{issued_at}"
+    signature = private_key.sign(
+        cert_data.encode(),
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+
+    certificate = {
+        "device_id": device_id,
+        "public_key_fingerprint": fingerprint,
+        "issued_at": issued_at,
+        "key_size": key_size,
+        "signature": base64.b64encode(signature).decode()
+    }
+    cert_path = dev_dir / "certificate.json"
+    with open(cert_path, "w") as f:
+        json.dump(certificate, f, indent=2)
+
+    return certificate
+
+
+def _load_device_keys(device_id: str):
+    """Load a registered device's RSA key pair."""
+    dev_dir = _device_dir(device_id)
+    if not dev_dir.exists():
+        raise FileNotFoundError(f"Device '{device_id}' is not registered.")
+
+    with open(dev_dir / "private_key.pem", "rb") as f:
+        priv = serialization.load_pem_private_key(f.read(), password=None, backend=default_backend())
+    with open(dev_dir / "public_key.pem", "rb") as f:
+        pub = serialization.load_pem_public_key(f.read(), backend=default_backend())
+    return priv, pub
+
+
+def device_encrypt(plaintext: str, target_device_id: str) -> str:
+    """
+    Hybrid RSA+AES encryption locked to a specific device.
+    Payload format: base64( device_id_len(2B) | device_id | rsa_encrypted_aes_key(256B) | salt(16B) | nonce(12B) | ciphertext | tag(16B) )
+    """
+    _, pub = _load_device_keys(target_device_id)
+
+    # Generate random AES key (not password-derived — true random)
+    aes_key = os.urandom(32)
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+
+    # RSA-OAEP encrypt the AES key with the device's public key
+    encrypted_aes_key = pub.encrypt(
+        aes_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+
+    # AES-256-GCM encrypt the plaintext, with device_id as AAD (authenticated)
+    aesgcm = AESGCM(aes_key)
+    ct = aesgcm.encrypt(nonce, plaintext.encode(), target_device_id.encode())
+
+    # Pack payload with embedded device ID
+    device_id_bytes = target_device_id.encode("utf-8")
+    header = struct.pack(">H", len(device_id_bytes)) + device_id_bytes
+    payload = header + encrypted_aes_key + salt + nonce + ct
+
+    return base64.b64encode(payload).decode()
+
+
+def device_decrypt(payload_b64: str, requesting_device_id: str) -> str:
+    """
+    Device-gated decryption: checks device ID match before decrypting.
+    Rejects if the requesting device doesn't match the payload's target.
+    """
+    raw = base64.b64decode(payload_b64.encode())
+
+    # Extract embedded device ID from payload header
+    id_len = struct.unpack(">H", raw[:2])[0]
+    target_device_id = raw[2:2 + id_len].decode("utf-8")
+
+    # ── DEVICE IDENTITY GATE ──
+    if requesting_device_id != target_device_id:
+        raise PermissionError(
+            f"ACCESS DENIED: Payload is locked to device '{target_device_id}'. "
+            f"Requesting device '{requesting_device_id}' is not authorized."
+        )
+
+    priv, _ = _load_device_keys(requesting_device_id)
+
+    # Determine RSA ciphertext length from key size
+    key_size_bytes = priv.key_size // 8
+    offset = 2 + id_len
+    encrypted_aes_key = raw[offset:offset + key_size_bytes]
+    offset += key_size_bytes
+    _salt = raw[offset:offset + 16]  # salt stored but not needed for random-key mode
+    offset += 16
+    nonce = raw[offset:offset + 12]
+    offset += 12
+    ct = raw[offset:]
+
+    # RSA-OAEP decrypt the AES key
+    aes_key = priv.decrypt(
+        encrypted_aes_key,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+
+    # AES-GCM decrypt with device_id as AAD
+    aesgcm = AESGCM(aes_key)
+    plaintext = aesgcm.decrypt(nonce, ct, target_device_id.encode())
+
+    return plaintext.decode()
+
+
+# ─────────────────────────────────────────
+# Sensor Data Integrity Chain
+# ─────────────────────────────────────────
+
+def _chain_path(device_id: str) -> Path:
+    return _device_dir(device_id) / "chain.json"
+
+
+def _hash_entry(entry: dict) -> str:
+    """Compute SHA-256 hash of a chain entry (excluding the hash and signature fields)."""
+    hashable = {k: v for k, v in entry.items() if k not in ("hash", "signature")}
+    canonical = json.dumps(hashable, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def sensor_init(device_id: str) -> dict:
+    """Create a new sensor chain with a genesis block for a registered device."""
+    dev_dir = _device_dir(device_id)
+    if not dev_dir.exists():
+        raise FileNotFoundError(f"Device '{device_id}' is not registered. Run device-register first.")
+
+    priv, _ = _load_device_keys(device_id)
+
+    genesis = {
+        "index": 0,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "device_id": device_id,
+        "reading": "GENESIS",
+        "prev_hash": "0" * 64,
+    }
+    genesis["hash"] = _hash_entry(genesis)
+
+    # Sign the genesis hash
+    sig = priv.sign(
+        genesis["hash"].encode(),
+        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+        hashes.SHA256()
+    )
+    genesis["signature"] = base64.b64encode(sig).decode()
+
+    chain = [genesis]
+    with open(_chain_path(device_id), "w") as f:
+        json.dump(chain, f, indent=2)
+
+    return genesis
+
+
+def sensor_push(device_id: str, reading: str) -> dict:
+    """Append a new hash-chained, signed sensor reading."""
+    chain_file = _chain_path(device_id)
+    if not chain_file.exists():
+        raise FileNotFoundError(f"No chain found for '{device_id}'. Run sensor-init first.")
+
+    with open(chain_file, "r") as f:
+        chain = json.load(f)
+
+    priv, _ = _load_device_keys(device_id)
+    prev = chain[-1]
+
+    entry = {
+        "index": prev["index"] + 1,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "device_id": device_id,
+        "reading": reading,
+        "prev_hash": prev["hash"],
+    }
+    entry["hash"] = _hash_entry(entry)
+
+    sig = priv.sign(
+        entry["hash"].encode(),
+        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+        hashes.SHA256()
+    )
+    entry["signature"] = base64.b64encode(sig).decode()
+
+    chain.append(entry)
+    with open(chain_file, "w") as f:
+        json.dump(chain, f, indent=2)
+
+    return entry
+
+
+def sensor_verify(device_id: str) -> dict:
+    """
+    Verify the full sensor chain integrity:
+    1. Each hash is correctly computed
+    2. Each prev_hash links to the actual previous entry
+    3. Each RSA-PSS signature is valid
+    4. No index gaps
+    Returns: {valid: bool, entries: int, error: str|None, broken_at: int|None}
+    """
+    chain_file = _chain_path(device_id)
+    if not chain_file.exists():
+        raise FileNotFoundError(f"No chain found for '{device_id}'.")
+
+    with open(chain_file, "r") as f:
+        chain = json.load(f)
+
+    _, pub = _load_device_keys(device_id)
+
+    for i, entry in enumerate(chain):
+        # Check index continuity
+        if entry["index"] != i:
+            return {"valid": False, "entries": len(chain), "error": f"Index gap: expected {i}, got {entry['index']}", "broken_at": i}
+
+        # Recompute and verify hash
+        expected_hash = _hash_entry(entry)
+        if entry["hash"] != expected_hash:
+            return {"valid": False, "entries": len(chain), "error": f"Hash mismatch at index {i}", "broken_at": i}
+
+        # Verify prev_hash link (skip genesis)
+        if i > 0 and entry["prev_hash"] != chain[i - 1]["hash"]:
+            return {"valid": False, "entries": len(chain), "error": f"Broken link: entry {i} prev_hash doesn't match entry {i-1}", "broken_at": i}
+
+        # Verify RSA-PSS signature
+        try:
+            sig_bytes = base64.b64decode(entry["signature"].encode())
+            pub.verify(
+                sig_bytes,
+                entry["hash"].encode(),
+                padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+                hashes.SHA256()
+            )
+        except Exception:
+            return {"valid": False, "entries": len(chain), "error": f"Invalid signature at index {i}", "broken_at": i}
+
+    return {"valid": True, "entries": len(chain), "error": None, "broken_at": None}
+
+
+# ─────────────────────────────────────────
 # CLI Commands
 # ─────────────────────────────────────────
 
@@ -378,6 +685,80 @@ def cmd_password_strength(args):
     print()
 
 
+def cmd_device_register(args):
+    try:
+        cert = device_register(args.device_id, args.bits)
+        print(f"\n✅ Device '{args.device_id}' registered successfully!")
+        print(f"   Fingerprint: {cert['public_key_fingerprint']}")
+        print(f"   Issued at:   {cert['issued_at']}")
+        print(f"   Key size:    {cert['key_size']}-bit RSA")
+        print(f"   Keys saved:  devices/{args.device_id}/")
+        print()
+    except Exception as e:
+        print(f"\n❌ Registration failed: {e}\n")
+
+
+def cmd_device_encrypt(args):
+    try:
+        result = device_encrypt(args.text, args.device_id)
+        print(f"\n🔒 Encrypted (device-bound to '{args.device_id}'):")
+        print(f"{result}\n")
+    except Exception as e:
+        print(f"\n❌ Device encryption failed: {e}\n")
+
+
+def cmd_device_decrypt(args):
+    try:
+        result = device_decrypt(args.payload, args.device_id)
+        print(f"\n🔓 Device '{args.device_id}' authorized — decrypted:")
+        print(f"{result}\n")
+    except PermissionError as e:
+        print(f"\n🚫 {e}\n")
+    except Exception as e:
+        print(f"\n❌ Device decryption failed: {e}\n")
+
+
+def cmd_sensor_init(args):
+    try:
+        genesis = sensor_init(args.device_id)
+        print(f"\n⛓️  Sensor chain initialized for '{args.device_id}'")
+        print(f"   Genesis hash: {genesis['hash'][:32]}...")
+        print(f"   Chain file:   devices/{args.device_id}/chain.json")
+        print()
+    except Exception as e:
+        print(f"\n❌ Chain init failed: {e}\n")
+
+
+def cmd_sensor_push(args):
+    try:
+        entry = sensor_push(args.device_id, args.reading)
+        print(f"\n📡 Reading #{entry['index']} added to chain")
+        print(f"   Data:      {entry['reading']}")
+        print(f"   Hash:      {entry['hash'][:32]}...")
+        print(f"   Prev hash: {entry['prev_hash'][:32]}...")
+        print(f"   Signed:    ✅ RSA-PSS")
+        print()
+    except Exception as e:
+        print(f"\n❌ Sensor push failed: {e}\n")
+
+
+def cmd_sensor_verify(args):
+    try:
+        result = sensor_verify(args.device_id)
+        if result["valid"]:
+            print(f"\n✅ Chain VALID — {result['entries']} entries verified")
+            print(f"   All hashes:     ✅ correct")
+            print(f"   All links:      ✅ intact")
+            print(f"   All signatures: ✅ authentic")
+        else:
+            print(f"\n❌ Chain BROKEN at entry #{result['broken_at']}")
+            print(f"   Error: {result['error']}")
+            print(f"   Entries checked: {result['entries']}")
+        print()
+    except Exception as e:
+        print(f"\n❌ Verification failed: {e}\n")
+
+
 # ─────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────
@@ -449,6 +830,44 @@ def main():
     p10.add_argument("--signature", required=True, help="Base64-encoded signature")
     p10.add_argument("--pubkey", required=True, help="Path to public key PEM file")
     p10.set_defaults(func=cmd_rsa_verify)
+
+    # ── IoT Device Authentication ──
+
+    # device-register
+    p11 = sub.add_parser("device-register", help="Register an IoT device with unique ID")
+    p11.add_argument("--device-id", required=True, help="Unique device identifier (e.g. sensor-42)")
+    p11.add_argument("--bits", type=int, default=2048, choices=[2048, 4096], help="RSA key size (default: 2048)")
+    p11.set_defaults(func=cmd_device_register)
+
+    # device-encrypt
+    p12 = sub.add_parser("device-encrypt", help="Encrypt data locked to a specific device")
+    p12.add_argument("--text", required=True, help="Plaintext to encrypt")
+    p12.add_argument("--device-id", required=True, help="Target device ID")
+    p12.set_defaults(func=cmd_device_encrypt)
+
+    # device-decrypt
+    p13 = sub.add_parser("device-decrypt", help="Decrypt with device identity verification")
+    p13.add_argument("--payload", required=True, help="Base64 device-encrypted payload")
+    p13.add_argument("--device-id", required=True, help="Requesting device ID")
+    p13.set_defaults(func=cmd_device_decrypt)
+
+    # ── Sensor Data Integrity Chain ──
+
+    # sensor-init
+    p14 = sub.add_parser("sensor-init", help="Initialize sensor data chain for a device")
+    p14.add_argument("--device-id", required=True, help="Device ID to create chain for")
+    p14.set_defaults(func=cmd_sensor_init)
+
+    # sensor-push
+    p15 = sub.add_parser("sensor-push", help="Push a sensor reading to the integrity chain")
+    p15.add_argument("--device-id", required=True, help="Device ID")
+    p15.add_argument("--reading", required=True, help="Sensor reading data (e.g. 'temp=22.5')")
+    p15.set_defaults(func=cmd_sensor_push)
+
+    # sensor-verify
+    p16 = sub.add_parser("sensor-verify", help="Verify sensor chain integrity")
+    p16.add_argument("--device-id", required=True, help="Device ID to verify chain for")
+    p16.set_defaults(func=cmd_sensor_verify)
 
     args = parser.parse_args()
     args.func(args)

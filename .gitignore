@@ -1,4 +1,5 @@
 # VaultCipher .gitignore
 keys/
+devices/
 __pycache__/
 *.pyc
