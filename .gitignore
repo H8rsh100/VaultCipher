@@ -3,3 +3,6 @@ keys/
 devices/
 __pycache__/
 *.pyc
+test_pss.js
+patent_draft_final.txt
+Vaultcipher.pdf

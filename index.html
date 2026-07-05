@@ -63,14 +63,61 @@
     .badge-aes{background:rgba(0,245,196,.12);color:var(--vc-accent);border:1px solid rgba(0,245,196,.3)}
     .badge-rsa{background:rgba(0,255,255,.1);color:var(--vc-accent2);border:1px solid rgba(0,255,255,.25)}
     .badge-hash{background:rgba(255,165,0,.12);color:#ffa500;border:1px solid rgba(255,165,0,.3)}
+    .badge-iot{background:rgba(179,136,255,.12);color:#b388ff;border:1px solid rgba(179,136,255,.3)}
     select{background:var(--vc-bg);border:1px solid var(--vc-border);color:var(--vc-text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:5px;outline:none;width:100%}
     .key-display{background:var(--vc-bg);border:1px solid var(--vc-border);border-radius:5px;padding:12px;font-size:10px;color:var(--vc-accent2);word-break:break-all;line-height:1.7;max-height:140px;overflow-y:auto}
-    footer{text-align:center;margin-top:40px;font-size:10px;letter-spacing:2px;color:var(--vc-muted)}
+    footer{text-align:center;margin-top:80px;margin-bottom:40px;font-size:10px;letter-spacing:2px;color:var(--vc-muted);border-top:1px solid rgba(255,255,255,0.03);padding-top:24px}
     /* Password strength meter */
     .pw-meter{margin-top:8px}
     .pw-meter-bar{height:4px;border-radius:2px;background:var(--vc-border);overflow:hidden;margin-bottom:4px}
     .pw-meter-fill{height:100%;border-radius:2px;transition:width .3s ease,background .3s ease;width:0}
     .pw-meter-label{font-size:9px;letter-spacing:1.5px;font-family:var(--head);font-weight:600}
+
+    /* Custom Scrollbar for all display elements */
+    .key-display, textarea, pre {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(179, 136, 255, 0.3) rgba(25, 25, 35, 0.8);
+    }
+    .key-display::-webkit-scrollbar, textarea::-webkit-scrollbar, pre::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .key-display::-webkit-scrollbar-track, textarea::-webkit-scrollbar-track, pre::-webkit-scrollbar-track {
+      background: rgba(25, 25, 35, 0.8);
+      border-radius: 3px;
+    }
+    .key-display::-webkit-scrollbar-thumb, textarea::-webkit-scrollbar-thumb, pre::-webkit-scrollbar-thumb {
+      background: rgba(179, 136, 255, 0.3);
+      border-radius: 3px;
+    }
+    .key-display::-webkit-scrollbar-thumb:hover, textarea::-webkit-scrollbar-thumb:hover, pre::-webkit-scrollbar-thumb:hover {
+      background: rgba(179, 136, 255, 0.6);
+    }
+
+    /* Textarea & Display adjustments */
+    #panel-iot textarea, #panel-iot .key-display {
+      background: rgba(20, 20, 30, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      color: #e2e8f0;
+      transition: all 0.25s ease;
+    }
+    #panel-iot textarea:focus {
+      border-color: rgba(179, 136, 255, 0.5);
+      box-shadow: 0 0 12px rgba(179, 136, 255, 0.15);
+    }
+    
+    /* Card Hover Glow */
+    #panel-iot .card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    #panel-iot .card:hover {
+      border-color: rgba(179, 136, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 15px rgba(179, 136, 255, 0.05);
+    }
   </style>
 </head>
 <body>
@@ -85,6 +132,7 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('aes')">AES-256-GCM</button>
     <button class="tab" onclick="switchTab('rsa')">RSA-2048</button>
+    <button class="tab" onclick="switchTab('iot')">IoT SECURITY</button>
     <button class="tab" onclick="switchTab('hash')">HASHING</button>
     <button class="tab" onclick="switchTab('about')">HOW IT WORKS</button>
   </div>
@@ -243,6 +291,161 @@
     </div>
   </div>
 
+  <!-- IoT SECURITY Panel -->
+  <div id="panel-iot" class="panel">
+    <!-- Component 1: Device Digital Identity Registry -->
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-iot">Component 1</span> &nbsp;Device Digital Identity Registry
+      </div>
+      <p style="font-size:11px;color:var(--vc-muted);margin-bottom:12px">
+        Generates asymmetric RSA-2048 or RSA-4096 identity keys bound to a unique Device ID, computing a SHA-256 public key fingerprint and issuing a signed Device Certificate.
+      </p>
+      <div class="mb">
+        <label>DEVICE ID</label>
+        <input type="text" id="iot-dev-id" placeholder="e.g. sensor-42" value="sensor-42">
+      </div>
+      <div class="mb">
+        <label>KEY SIZE</label>
+        <select id="iot-key-size">
+          <option value="2048">2048 bits (recommended)</option>
+          <option value="4096">4096 bits (paranoid mode)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="iotRegisterDevice()">REGISTER DEVICE</button>
+      <div id="iot-reg-status" class="status"></div>
+      
+      <!-- Generated keys / cert details -->
+      <div id="iot-keys-card" style="display:none;margin-top:14px">
+        <div class="mb">
+          <div class="output-label">PUBLIC KEY (PEM)</div>
+          <div class="key-display" id="iot-pub" style="max-height:100px"></div>
+          <button class="btn btn-secondary" onclick="copyText(document.getElementById('iot-pub').innerText)" style="margin-top:6px;font-size:10px;padding:4px 10px">COPY PUBLIC KEY</button>
+        </div>
+        <div class="mb">
+          <div class="output-label">PRIVATE KEY (PEM)</div>
+          <div class="key-display" id="iot-priv" style="max-height:100px;color:var(--vc-danger)"></div>
+          <button class="btn btn-secondary" onclick="copyText(document.getElementById('iot-priv').innerText)" style="margin-top:6px;font-size:10px;padding:4px 10px;border-color:var(--vc-danger);color:var(--vc-danger)">COPY PRIVATE KEY</button>
+        </div>
+        <div class="mb">
+          <div class="output-label">SIGNED DEVICE CERTIFICATE (JSON)</div>
+          <div class="key-display" id="iot-cert" style="max-height:120px;color:var(--vc-accent)"></div>
+          <button class="btn btn-secondary" onclick="copyText(document.getElementById('iot-cert').innerText)" style="margin-top:6px;font-size:10px;padding:4px 10px">COPY CERTIFICATE</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Component 2: Device Bound Hybrid Cryptographic Engine -->
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-iot">Component 2</span> &nbsp;Device Bound Hybrid Cryptographic Engine
+      </div>
+      <p style="font-size:11px;color:var(--vc-muted);margin-bottom:12px">
+        Provides GCM-mode encryption authenticated with target Device ID as Additional Authenticated Data (AAD) and gates decryption to matched device identities.
+      </p>
+      <div class="seg">
+        <button class="seg-btn active" id="iot-crypto-enc-tab" onclick="setIotCryptoMode('encrypt')">ENCRYPT (LOCK)</button>
+        <button class="seg-btn" id="iot-crypto-dec-tab" onclick="setIotCryptoMode('decrypt')">DECRYPT (GATE)</button>
+      </div>
+
+      <!-- Encrypt Section -->
+      <div id="iot-crypto-enc-ui">
+        <div class="mb">
+          <label>PLAINTEXT TELEMETRY DATA</label>
+          <textarea id="iot-plain" placeholder="Enter sensor data or telemetry readings..." style="min-height:60px"></textarea>
+        </div>
+        <div class="mb">
+          <label>DESTINATION DEVICE ID</label>
+          <input type="text" id="iot-dest-id" placeholder="e.g. sensor-42" value="sensor-42">
+        </div>
+        <div class="mb">
+          <label>DESTINATION PUBLIC KEY (PEM)</label>
+          <textarea id="iot-dest-pub" placeholder="Paste target device's public key PEM..." style="min-height:80px;color:#8899aa"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="iotEncrypt()">ENCRYPT AND BIND</button>
+      </div>
+
+      <!-- Decrypt Section -->
+      <div id="iot-crypto-dec-ui" style="display:none">
+        <div class="mb">
+          <label>LOCKED BASE64 PAYLOAD</label>
+          <textarea id="iot-cipher" placeholder="Paste locked device-bound base64 payload..." style="min-height:60px"></textarea>
+        </div>
+        <div class="mb">
+          <label>REQUESTING DEVICE ID</label>
+          <input type="text" id="iot-req-id" placeholder="e.g. sensor-42" value="sensor-42">
+        </div>
+        <div class="mb">
+          <label>DEVICE PRIVATE KEY (PEM)</label>
+          <textarea id="iot-req-priv" placeholder="Paste requesting device's private key PEM..." style="min-height:80px;color:var(--vc-danger)"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="iotDecrypt()">VERIFY AND DECRYPT</button>
+      </div>
+
+      <div id="iot-crypto-status" class="status"></div>
+      <div id="iot-crypto-out-card" style="display:none;margin-top:14px">
+        <div class="output-label">OUTPUT RESULT</div>
+        <div class="output-box">
+          <button class="copy-btn" onclick="copyOut('iot-crypto-out-text')">COPY</button>
+          <span id="iot-crypto-out-text" style="word-break:break-all"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Component 3: Deterministic Block Hashing & Signing Engine -->
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-iot">Component 3</span> &nbsp;Deterministic Block Hashing & Signing Engine
+      </div>
+      <p style="font-size:11px;color:var(--vc-muted);margin-bottom:12px">
+        Creates sequential, hash-linked sensor readings signed with the device's private key using RSA-PSS padding, sorting JSON keys and omitting hash/signature fields.
+      </p>
+      <div class="mb">
+        <label>DEVICE ID</label>
+        <input type="text" id="iot-ledger-dev-id" placeholder="e.g. sensor-42" value="sensor-42">
+      </div>
+      <div class="mb">
+        <label>DEVICE PRIVATE KEY (PEM)</label>
+        <textarea id="iot-ledger-priv" placeholder="Paste private key to sign the block..." style="min-height:80px;color:var(--vc-danger)"></textarea>
+      </div>
+      <div class="mb">
+        <label>SENSOR READING / PAYLOAD</label>
+        <input type="text" id="iot-ledger-reading" placeholder="e.g. Temp: 22.4 C, Hum: 45%" value="Temp: 23.5 C, Press: 1013 hPa">
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="iotLedgerPush()">PUSH BLOCK TO LEDGER</button>
+        <button class="btn btn-secondary" onclick="iotLedgerClear()" style="border-color:var(--vc-danger);color:var(--vc-danger)">RESET LEDGER</button>
+      </div>
+      <div id="iot-ledger-status" class="status"></div>
+
+      <div id="iot-ledger-block-card" style="display:none;margin-top:14px">
+        <div class="output-label">LATEST APPENDED BLOCK</div>
+        <pre class="key-display" id="iot-ledger-block-text" style="max-height:180px;color:var(--vc-accent2)"></pre>
+      </div>
+
+      <div class="divider"></div>
+      <div class="output-label">SENSOR TELEMETRY LEDGER (chain.json)</div>
+      <textarea id="iot-ledger-full-text" style="width:100%;min-height:160px;background:var(--vc-bg);border:1px solid var(--vc-border);border-radius:5px;padding:12px;font-size:10px;font-family:var(--mono);color:#8899aa;outline:none;resize:vertical" placeholder="[]"></textarea>
+      <div class="hint" style="margin-top:6px;font-size:10px">To test the Forensic Audit Engine: edit the ledger JSON directly in the textarea above (e.g. alter a reading value), then click 'AUDIT LEDGER INTEGRITY' below.</div>
+    </div>
+
+    <!-- Component 4: Forensic Audit & Validation Engine -->
+    <div class="card">
+      <div class="card-title">
+        <span class="badge badge-iot">Component 4</span> &nbsp;Forensic Audit & Validation Engine
+      </div>
+      <p style="font-size:11px;color:var(--vc-muted);margin-bottom:12px">
+        Performs a linear audit of the telemetry ledger, verifying block hashes, chronological links, and RSA-PSS signatures to detect alteration.
+      </p>
+      <div class="mb">
+        <label>REGISTERED DEVICE PUBLIC KEY (PEM)</label>
+        <textarea id="iot-audit-pub" placeholder="Paste device's public key PEM to verify signatures..." style="min-height:80px;color:#8899aa"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="iotLedgerVerify()">AUDIT LEDGER INTEGRITY</button>
+      <div id="iot-audit-status" class="status"></div>
+    </div>
+  </div>
+
   <!-- Hash Panel -->
   <div id="panel-hash" class="panel">
     <div class="card">
@@ -339,7 +542,7 @@
 <script src="forge.min.js"></script>
 <script>
 function switchTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',['aes','rsa','hash','about'][i]===t)});
+  document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',['aes','rsa','iot','hash','about'][i]===t)});
   document.querySelectorAll('.panel').forEach(el=>el.classList.remove('active'));
   document.getElementById('panel-'+t).classList.add('active');
 }
@@ -566,6 +769,358 @@ function updatePwMeter(pw, meterId){
   else{color='#ff4757';rating='CRITICAL';}
   fill.style.width=score+'%';fill.style.background=color;
   label.textContent=rating+' ('+score+'/100)';label.style.color=color;
+}
+
+// ── IoT Security functions ──
+function getPssSaltLength(keySize) {
+  return (keySize / 8) - 32 - 2;
+}
+
+function showIotStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  el.className = 'status ' + type;
+  el.textContent = msg;
+}
+
+function setIotCryptoMode(m) {
+  document.getElementById('iot-crypto-enc-ui').style.display = m === 'encrypt' ? '' : 'none';
+  document.getElementById('iot-crypto-dec-ui').style.display = m === 'decrypt' ? '' : 'none';
+  document.getElementById('iot-crypto-enc-tab').classList.toggle('active', m === 'encrypt');
+  document.getElementById('iot-crypto-dec-tab').classList.toggle('active', m === 'decrypt');
+  document.getElementById('iot-crypto-out-card').style.display = 'none';
+}
+
+function iotRegisterDevice() {
+  const devId = document.getElementById('iot-dev-id').value.trim();
+  const bits = parseInt(document.getElementById('iot-key-size').value);
+  if (!devId) {
+    showIotStatus('iot-reg-status', 'err', 'Device ID cannot be empty.');
+    return;
+  }
+  showIotStatus('iot-reg-status', 'ok', 'Generating key pair and certificate...');
+  setTimeout(() => {
+    try {
+      const kp = forge.pki.rsa.generateKeyPair({ bits, e: 0x10001 });
+      const pubPem = forge.pki.publicKeyToPem(kp.publicKey);
+      const privPem = forge.pki.privateKeyToPem(kp.privateKey);
+      
+      const pubDer = forge.asn1.toDer(forge.pki.publicKeyToAsn1(kp.publicKey)).getBytes();
+      const md = forge.md.sha256.create();
+      md.update(pubDer);
+      const fingerprint = 'SHA256:' + md.digest().toHex();
+      
+      const issuedAt = new Date().toISOString();
+      const certData = devId + '|' + fingerprint + '|' + issuedAt;
+      
+      const mdSign = forge.md.sha256.create();
+      mdSign.update(certData, 'utf8');
+      const pss = forge.pss.create({
+        md: forge.md.sha256.create(),
+        mgf: forge.mgf.mgf1.create(forge.md.sha256.create()),
+        saltLength: getPssSaltLength(bits)
+      });
+      const sig = kp.privateKey.sign(mdSign, pss);
+      const signature = forge.util.encode64(sig);
+      
+      const certificate = {
+        device_id: devId,
+        public_key_fingerprint: fingerprint,
+        issued_at: issuedAt,
+        key_size: bits,
+        signature: signature
+      };
+      
+      document.getElementById('iot-pub').textContent = pubPem;
+      document.getElementById('iot-priv').textContent = privPem;
+      document.getElementById('iot-cert').textContent = JSON.stringify(certificate, null, 2);
+      
+      // Auto-populate helper fields to make testing frictionless
+      document.getElementById('iot-dest-pub').value = pubPem;
+      document.getElementById('iot-req-priv').value = privPem;
+      document.getElementById('iot-ledger-priv').value = privPem;
+      document.getElementById('iot-audit-pub').value = pubPem;
+      
+      document.getElementById('iot-keys-card').style.display = 'block';
+      showIotStatus('iot-reg-status', 'ok', 'Device registered successfully!');
+    } catch (e) {
+      showIotStatus('iot-reg-status', 'err', 'Registration failed: ' + e.message);
+    }
+  }, 50);
+}
+
+function iotEncrypt() {
+  const plaintext = document.getElementById('iot-plain').value;
+  const destId = document.getElementById('iot-dest-id').value.trim();
+  const pubPem = document.getElementById('iot-dest-pub').value.trim();
+  if (!plaintext || !destId || !pubPem) {
+    showIotStatus('iot-crypto-status', 'err', 'Please fill in all encryption fields.');
+    return;
+  }
+  try {
+    const pub = forge.pki.publicKeyFromPem(pubPem);
+    const keySize = pub.n.bitLength();
+    
+    // Generate AES key, salt, and nonce
+    const aesKey = forge.random.getBytesSync(32);
+    const salt = forge.random.getBytesSync(16);
+    const iv = forge.random.getBytesSync(12);
+    
+    // RSA-OAEP encrypt AES key
+    const encryptedKey = pub.encrypt(aesKey, 'RSA-OAEP', {
+      md: forge.md.sha256.create(),
+      mgf1: { md: forge.md.sha256.create() }
+    });
+    
+    // AES-GCM encrypt plaintext with destId as AAD
+    const cipher = forge.cipher.createCipher('AES-GCM', aesKey);
+    cipher.start({ iv, additionalData: destId });
+    cipher.update(forge.util.createBuffer(plaintext, 'utf8'));
+    cipher.finish();
+    const ct = cipher.output.getBytes();
+    const tag = cipher.mode.tag.getBytes();
+    
+    // Pack: len(2B) | destId | encryptedKey | salt(16) | nonce(12) | ct | tag(16)
+    const destIdBytes = forge.util.encodeUtf8(destId);
+    const idLen = destIdBytes.length;
+    const lenBytes = String.fromCharCode((idLen >> 8) & 0xff) + String.fromCharCode(idLen & 0xff);
+    
+    const packed = lenBytes + destIdBytes + encryptedKey + salt + iv + ct + tag;
+    const payloadB64 = forge.util.encode64(packed);
+    
+    document.getElementById('iot-crypto-out-text').textContent = payloadB64;
+    document.getElementById('iot-cipher').value = payloadB64; // Auto-fill decrypt field
+    document.getElementById('iot-crypto-out-card').style.display = 'block';
+    showIotStatus('iot-crypto-status', 'ok', 'Payload successfully encrypted and bound to target ID.');
+  } catch (e) {
+    showIotStatus('iot-crypto-status', 'err', 'Encryption failed: ' + e.message);
+  }
+}
+
+function iotDecrypt() {
+  const payloadB64 = document.getElementById('iot-cipher').value.trim();
+  const reqId = document.getElementById('iot-req-id').value.trim();
+  const privPem = document.getElementById('iot-req-priv').value.trim();
+  if (!payloadB64 || !reqId || !privPem) {
+    showIotStatus('iot-crypto-status', 'err', 'Please fill in all decryption fields.');
+    return;
+  }
+  try {
+    const raw = forge.util.decode64(payloadB64);
+    if (raw.length < 2) throw new Error("Payload too short.");
+    
+    const len1 = raw.charCodeAt(0);
+    const len2 = raw.charCodeAt(1);
+    const idLen = (len1 << 8) | len2;
+    if (raw.length < 2 + idLen) throw new Error("Invalid payload header.");
+    
+    const targetDeviceId = raw.slice(2, 2 + idLen);
+    
+    // ── DEVICE IDENTITY GATE ──
+    if (reqId !== targetDeviceId) {
+      throw new Error("ACCESS DENIED: Payload is locked to device '" + targetDeviceId + "'. Requesting device '" + reqId + "' is not authorized.");
+    }
+    
+    const priv = forge.pki.privateKeyFromPem(privPem);
+    const keySizeBytes = priv.n.bitLength() / 8;
+    let offset = 2 + idLen;
+    
+    if (raw.length < offset + keySizeBytes + 16 + 12 + 16) throw new Error("Payload structure is corrupted.");
+    
+    const encryptedKey = raw.slice(offset, offset + keySizeBytes);
+    offset += keySizeBytes;
+    const salt = raw.slice(offset, offset + 16);
+    offset += 16;
+    const iv = raw.slice(offset, offset + 12);
+    offset += 12;
+    const ctAndTag = raw.slice(offset);
+    const ct = ctAndTag.slice(0, ctAndTag.length - 16);
+    const tag = ctAndTag.slice(ctAndTag.length - 16);
+    
+    // Decrypt AES key
+    const aesKey = priv.decrypt(encryptedKey, 'RSA-OAEP', {
+      md: forge.md.sha256.create(),
+      mgf1: { md: forge.md.sha256.create() }
+    });
+    
+    // Decrypt ciphertext
+    const decipher = forge.cipher.createDecipher('AES-GCM', aesKey);
+    decipher.start({ iv, tag, additionalData: targetDeviceId });
+    decipher.update(forge.util.createBuffer(ct));
+    const ok = decipher.finish();
+    if (!ok) throw new Error("GCM tag check failed. Data is corrupted or key is incorrect.");
+    
+    document.getElementById('iot-crypto-out-text').textContent = decipher.output.toString('utf8');
+    document.getElementById('iot-crypto-out-card').style.display = 'block';
+    showIotStatus('iot-crypto-status', 'ok', 'Decryption successful.');
+  } catch (e) {
+    showIotStatus('iot-crypto-status', 'err', 'Decryption failed: ' + e.message);
+  }
+}
+
+// ── Ledger blockchain functions ──
+function iotHashEntry(entry) {
+  const hashable = {};
+  const keys = Object.keys(entry).filter(k => k !== 'hash' && k !== 'signature').sort();
+  keys.forEach(k => {
+    hashable[k] = entry[k];
+  });
+  const canonical = JSON.stringify(hashable);
+  const md = forge.md.sha256.create();
+  md.update(canonical, 'utf8');
+  return md.digest().toHex();
+}
+
+function iotLedgerPush() {
+  const devId = document.getElementById('iot-ledger-dev-id').value.trim();
+  const privPem = document.getElementById('iot-ledger-priv').value.trim();
+  const reading = document.getElementById('iot-ledger-reading').value;
+  if (!devId || !privPem || !reading) {
+    showIotStatus('iot-ledger-status', 'err', 'Please specify Device ID, Private Key, and Sensor Reading.');
+    return;
+  }
+  try {
+    const priv = forge.pki.privateKeyFromPem(privPem);
+    const keySize = priv.n.bitLength();
+    
+    // Retrieve current chain from local storage
+    const storageKey = 'vaultcipher_iot_chain_' + devId;
+    let chain = [];
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) chain = JSON.parse(stored);
+    } catch(e) { chain = []; }
+    
+    let entry = {};
+    if (chain.length === 0) {
+      entry = {
+        index: 0,
+        timestamp: new Date().toISOString(),
+        device_id: devId,
+        reading: "GENESIS",
+        prev_hash: "0".repeat(64)
+      };
+    } else {
+      const prev = chain[chain.length - 1];
+      entry = {
+        index: prev.index + 1,
+        timestamp: new Date().toISOString(),
+        device_id: devId,
+        reading: reading,
+        prev_hash: prev.hash
+      };
+    }
+    
+    const entryHash = iotHashEntry(entry);
+    entry.hash = entryHash;
+    
+    const mdSign = forge.md.sha256.create();
+    mdSign.update(entryHash, 'utf8');
+    const pss = forge.pss.create({
+      md: forge.md.sha256.create(),
+      mgf: forge.mgf.mgf1.create(forge.md.sha256.create()),
+      saltLength: getPssSaltLength(keySize)
+    });
+    const sig = priv.sign(mdSign, pss);
+    entry.signature = forge.util.encode64(sig);
+    
+    chain.push(entry);
+    localStorage.setItem(storageKey, JSON.stringify(chain));
+    
+    document.getElementById('iot-ledger-block-text').textContent = JSON.stringify(entry, null, 2);
+    document.getElementById('iot-ledger-block-card').style.display = 'block';
+    
+    const ledgerTextarea = document.getElementById('iot-ledger-full-text');
+    ledgerTextarea.value = JSON.stringify(chain, null, 2);
+    
+    showIotStatus('iot-ledger-status', 'ok', 'Block #' + entry.index + ' successfully appended to ledger.');
+  } catch(e) {
+    showIotStatus('iot-ledger-status', 'err', 'Failed to append block: ' + e.message);
+  }
+}
+
+function iotLedgerClear() {
+  const devId = document.getElementById('iot-ledger-dev-id').value.trim();
+  if (!devId) {
+    showIotStatus('iot-ledger-status', 'err', 'Specify Device ID to reset its ledger.');
+    return;
+  }
+  localStorage.removeItem('vaultcipher_iot_chain_' + devId);
+  document.getElementById('iot-ledger-block-card').style.display = 'none';
+  document.getElementById('iot-ledger-full-text').value = '[]';
+  showIotStatus('iot-ledger-status', 'ok', 'Ledger for device "' + devId + '" has been reset.');
+}
+
+function iotLedgerVerify() {
+  const pubPem = document.getElementById('iot-audit-pub').value.trim();
+  const rawLedger = document.getElementById('iot-ledger-full-text').value.trim();
+  if (!pubPem || !rawLedger) {
+    showIotStatus('iot-audit-status', 'err', 'Please specify Registered Public Key and ledger JSON.');
+    return;
+  }
+  try {
+    let chain;
+    try {
+      chain = JSON.parse(rawLedger);
+    } catch (e) {
+      showIotStatus('iot-audit-status', 'err', '❌ FORENSIC AUDIT FAILURE: Invalid JSON syntax in the ledger. Please ensure the ledger format is a valid JSON array of blocks.');
+      return;
+    }
+    if (!Array.isArray(chain)) throw new Error("Ledger must be a JSON array of blocks.");
+    if (chain.length === 0) {
+      showIotStatus('iot-audit-status', 'err', 'Ledger is empty. Push some blocks first.');
+      return;
+    }
+    
+    const pub = forge.pki.publicKeyFromPem(pubPem);
+    const keySize = pub.n.bitLength();
+    
+    for (let i = 0; i < chain.length; i++) {
+      const entry = chain[i];
+      
+      // 1. Index continuity
+      if (entry.index !== i) {
+        showIotStatus('iot-audit-status', 'err', 'FORENSIC AUDIT FAILURE: Index gap detected at block #' + i + '. Expected index ' + i + ', got ' + entry.index + '.');
+        return;
+      }
+      
+      // 2. Hash recomputation
+      const expectedHash = iotHashEntry(entry);
+      if (entry.hash !== expectedHash) {
+        showIotStatus('iot-audit-status', 'err', 'FORENSIC AUDIT FAILURE: Tampering detected! Recomputed hash for block #' + i + ' does not match stored hash. Expected "' + expectedHash + '", got "' + entry.hash + '".');
+        return;
+      }
+      
+      // 3. Link continuity
+      if (i > 0 && entry.prev_hash !== chain[i - 1].hash) {
+        showIotStatus('iot-audit-status', 'err', 'FORENSIC AUDIT FAILURE: Ledger integrity broken! Block #' + i + ' link "prev_hash" does not match hash of block #' + (i-1) + '.');
+        return;
+      }
+      
+      // 4. RSA-PSS signature verification
+      try {
+        const sig = forge.util.decode64(entry.signature);
+        const md = forge.md.sha256.create();
+        md.update(entry.hash, 'utf8');
+        const pss = forge.pss.create({
+          md: forge.md.sha256.create(),
+          mgf: forge.mgf.mgf1.create(forge.md.sha256.create()),
+          saltLength: getPssSaltLength(keySize)
+        });
+        const valid = pub.verify(md.digest().bytes(), sig, pss);
+        if (!valid) {
+          showIotStatus('iot-audit-status', 'err', 'FORENSIC AUDIT FAILURE: Invalid signature at block #' + i + '. Block was not signed by this device.');
+          return;
+        }
+      } catch (e) {
+        showIotStatus('iot-audit-status', 'err', 'FORENSIC AUDIT FAILURE: Signature check failed at block #' + i + ': ' + e.message);
+        return;
+      }
+    }
+    
+    showIotStatus('iot-audit-status', 'ok', '✅ FORENSIC AUDIT SUCCESS: All ' + chain.length + ' blocks are valid. Hashing, link chain, and device signature verified successfully.');
+  } catch (e) {
+    showIotStatus('iot-audit-status', 'err', 'Audit failed to run: ' + e.message);
+  }
 }
 </script>
 </body>
