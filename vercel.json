@@ -1,5 +1,9 @@
 {
   "version": 2,
-  "cleanUrls": true
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "forge.min.js", "use": "@vercel/static" }
+  ]
 }
+
 
