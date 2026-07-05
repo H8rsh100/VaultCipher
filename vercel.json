@@ -1,8 +1,5 @@
 {
   "version": 2,
-  "outputDirectory": ".",
-  "builds": [
-    { "src": "*.html", "use": "@vercel/static" },
-    { "src": "*.js", "use": "@vercel/static" }
-  ]
+  "cleanUrls": true
 }
+
