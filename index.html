@@ -516,22 +516,52 @@
       </div>
     </div>
     <div class="card">
-      <div class="card-title">CLI USAGE</div>
+      <div class="card-title"><span class="badge badge-iot" style="margin-right:8px">PATENT PENDING</span>IoT Device Authentication System</div>
+      <p style="font-size:12px;color:var(--vc-text2);line-height:1.8;margin-bottom:16px">
+        A four-component cryptographic architecture for tamper-evident IoT sensor data integrity. Operates fully offline — no cloud, no server, no internet required.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="border-left:2px solid rgba(179,136,255,0.4);padding-left:12px">
+          <div style="font-family:var(--head);font-size:12px;font-weight:600;color:#b388ff;letter-spacing:1.5px;margin-bottom:4px">&#x2460; DEVICE IDENTITY REGISTRY</div>
+          <div style="font-size:11px;color:var(--vc-text2);line-height:1.7">Generates an RSA keypair bound to a unique Device ID. Computes a SHA-256 SPKI fingerprint of the public key and issues a locally-signed device certificate.</div>
+        </div>
+        <div style="border-left:2px solid rgba(179,136,255,0.4);padding-left:12px">
+          <div style="font-family:var(--head);font-size:12px;font-weight:600;color:#b388ff;letter-spacing:1.5px;margin-bottom:4px">&#x2461; DEVICE-BOUND HYBRID ENCRYPTION</div>
+          <div style="font-size:11px;color:var(--vc-text2);line-height:1.7">Encrypts data with AES-256-GCM, passing the target Device ID as Additional Authenticated Data (AAD). The AES key is wrapped with RSA-OAEP. Decryption is <strong style="color:var(--vc-danger)">ACCESS DENIED</strong> if the requesting device ID does not match the embedded target ID.</div>
+        </div>
+        <div style="border-left:2px solid rgba(179,136,255,0.4);padding-left:12px">
+          <div style="font-family:var(--head);font-size:12px;font-weight:600;color:#b388ff;letter-spacing:1.5px;margin-bottom:4px">&#x2462; DETERMINISTIC BLOCK HASHING LEDGER</div>
+          <div style="font-size:11px;color:var(--vc-text2);line-height:1.7">Each sensor reading is stored as a hash-linked block. The block hash is computed by serializing fields with sorted keys (excluding hash/signature to avoid circular references), then signed with the device private key via RSA-PSS.</div>
+        </div>
+        <div style="border-left:2px solid rgba(179,136,255,0.4);padding-left:12px">
+          <div style="font-family:var(--head);font-size:12px;font-weight:600;color:#b388ff;letter-spacing:1.5px;margin-bottom:4px">&#x2463; FORENSIC AUDIT ENGINE</div>
+          <div style="font-size:11px;color:var(--vc-text2);line-height:1.7">Performs an O(N) linear scan: verifies index continuity, recomputes each block SHA-256 hash, validates the chronological prev_hash link, and verifies the RSA-PSS signature — detecting any tampering instantly.</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div style="font-size:11px;color:var(--vc-text2);line-height:2">
+        <div>Ledger hash &nbsp;&nbsp;&nbsp;&nbsp;&#x2192; <span style="color:#b388ff">SHA-256 (sorted-key canonical JSON)</span></div>
+        <div>Signatures &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; <span style="color:#b388ff">RSA-PSS / SHA-256</span></div>
+        <div>Encryption &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; <span style="color:#b388ff">RSA-OAEP + AES-256-GCM + Device AAD</span></div>
+        <div>Deployment &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#x2192; <span style="color:#b388ff">Fully offline / air-gapped capable</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Resources &amp; CLI</div>
       <div style="font-size:11px;color:var(--vc-text2);line-height:2.2">
-        <div style="color:var(--vc-muted)"># Install dependency</div>
+        <div style="color:var(--vc-muted)"># Install Python dependency</div>
         <div style="color:var(--vc-accent)">pip install cryptography</div>
         <br>
-        <div style="color:var(--vc-muted)"># AES encrypt</div>
-        <div style="color:var(--vc-text)">python vaultcipher_cli.py aes-encrypt --text "secret" --password "mypass"</div>
-        <br>
-        <div style="color:var(--vc-muted)"># Generate RSA keys</div>
-        <div style="color:var(--vc-text)">python vaultcipher_cli.py rsa-keygen --bits 2048 --output ./keys</div>
-        <br>
-        <div style="color:var(--vc-muted)"># RSA encrypt</div>
-        <div style="color:var(--vc-text)">python vaultcipher_cli.py rsa-encrypt --text "hello" --pubkey ./keys/public_key.pem</div>
-        <br>
-        <div style="color:var(--vc-muted)"># RSA decrypt</div>
-        <div style="color:var(--vc-text)">python vaultcipher_cli.py rsa-decrypt --payload "BASE64..." --privkey ./keys/private_key.pem</div>
+        <div style="color:var(--vc-muted)"># Register IoT device &amp; build sensor chain</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py device-register --device-id sensor-42</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py sensor-init --device-id sensor-42</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py sensor-push --device-id sensor-42 --reading "temp=22.5"</div>
+        <div style="color:var(--vc-text)">python vaultcipher_cli.py sensor-verify --device-id sensor-42</div>
+        <div class="divider" style="margin:12px 0"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:var(--vc-muted)">Source Code &#x2192;</span>
+          <a href="https://github.com/H8rsh100/VaultCipher" target="_blank" style="color:var(--vc-accent2);text-decoration:none;letter-spacing:1px">github.com/H8rsh100/VaultCipher</a>
+        </div>
       </div>
     </div>
   </div>
