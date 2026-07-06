@@ -5,7 +5,7 @@
 
 ![Made with Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
 ![Crypto](https://img.shields.io/badge/Crypto-AES--256--GCM%20%7C%20RSA--2048%20%7C%20SHA-00f5c4?style=flat)
-![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat)
 
 ---
