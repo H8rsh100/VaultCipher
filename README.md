@@ -1,7 +1,7 @@
 # 🔐 VaultCipher
 
 > **AES-256-GCM + RSA-2048 + SHA Hashing + Digital Signatures**  
-> Python CLI + Offline Browser UI — No server. No cloud. Pure cryptography.
+> Python CLI + Offline Browser UI - No server. No cloud. Pure cryptography.
 
 ![Made with Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=flat&logo=python&logoColor=white)
 ![Crypto](https://img.shields.io/badge/Crypto-AES--256--GCM%20%7C%20RSA--2048%20%7C%20SHA-00f5c4?style=flat)
@@ -14,17 +14,17 @@
 
 VaultCipher is a comprehensive cryptographic toolkit that lets you **encrypt, decrypt, hash, sign, and verify** using battle-tested algorithms:
 
-- **AES-256-GCM** — Symmetric authenticated encryption used by governments and banks
-- **RSA-2048/4096** — Asymmetric encryption behind HTTPS, SSH, and secure communications
-- **RSA-PSS** — Digital signatures for message authentication and non-repudiation
-- **SHA-256/384/512** — Cryptographic hashing for integrity verification
-- **Password Strength Analysis** — Entropy-based password scoring with pattern detection
-- **IoT Device Authentication** — Registers unique device IDs with RSA keys and cryptographically gates decrypted payloads to target devices
-- **IoT Sensor Integrity Chain** — Chronological, tamper-evident hash-chained sensor logging signed via RSA-PSS to prevent telemetry injection or modification
+- **AES-256-GCM** - Symmetric authenticated encryption used by governments and banks
+- **RSA-2048/4096** - Asymmetric encryption behind HTTPS, SSH, and secure communications
+- **RSA-PSS** - Digital signatures for message authentication and non-repudiation
+- **SHA-256/384/512** - Cryptographic hashing for integrity verification
+- **Password Strength Analysis** - Entropy-based password scoring with pattern detection
+- **IoT Device Authentication** - Registers unique device IDs with RSA keys and cryptographically gates decrypted payloads to target devices
+- **IoT Sensor Integrity Chain** - Chronological, tamper-evident hash-chained sensor logging signed via RSA-PSS to prevent telemetry injection or modification
 
 It comes with two interfaces:
 - A **Python CLI** for terminal-based cryptographic operations
-- A **fully offline Browser UI** — open `index.html` and it just works, no internet required
+- A **fully offline Browser UI** - open `index.html` and it just works, no internet required
 
 > ⚠️ Built for **educational purposes**. Demonstrates real cryptographic principles used in production systems.
 
@@ -64,7 +64,7 @@ pip install -r requirements.txt
 
 ## 💻 CLI Usage
 
-### AES-256-GCM — Symmetric Encryption
+### AES-256-GCM - Symmetric Encryption
 
 **Encrypt a message:**
 ```bash
@@ -78,7 +78,7 @@ python vaultcipher_cli.py aes-decrypt --payload "BASE64_CIPHERTEXT_HERE" --passw
 
 ---
 
-### RSA-2048 — Asymmetric Encryption
+### RSA-2048 - Asymmetric Encryption
 
 **Generate a key pair:**
 ```bash
@@ -98,7 +98,7 @@ python vaultcipher_cli.py rsa-decrypt --payload "BASE64_CIPHERTEXT_HERE" --privk
 
 ---
 
-### ✍️ RSA-PSS — Digital Signatures
+### ✍️ RSA-PSS - Digital Signatures
 
 **Sign a message:**
 ```bash
@@ -142,7 +142,7 @@ python vaultcipher_cli.py password-strength --password "MyS3cur3P@ssw0rd!"
 ```
 
 Output includes:
-- Score (0–100) with visual bar
+- Score (0-100) with visual bar
 - Rating (CRITICAL / WEAK / FAIR / GOOD / STRONG)
 - Entropy estimation in bits
 - Actionable feedback on how to improve
@@ -192,7 +192,7 @@ python vaultcipher_cli.py sensor-verify --device-id "sensor-42"
 
 1. Make sure `index.html` and `forge.min.js` are in the **same folder**
 2. Double-click `index.html` to open in your browser
-3. No internet connection required — everything runs locally
+3. No internet connection required - everything runs locally
 
 | Tab | Features |
 |-----|----------|
@@ -203,7 +203,7 @@ python vaultcipher_cli.py sensor-verify --device-id "sensor-42"
 
 ---
 
-## 🔬 How It Works — The Cryptography
+## 🔬 How It Works - The Cryptography
 
 ### AES-256-GCM (Symmetric)
 
@@ -222,18 +222,18 @@ AES (Advanced Encryption Standard) in GCM (Galois/Counter Mode) is the gold stan
 1. Generate a random 16-byte **salt**
 2. Derive a 256-bit key from your password using **PBKDF2-SHA256** (480k iterations)
 3. Generate a random 12-byte **nonce**
-4. Encrypt the message using **AES-GCM** → produces ciphertext + 16-byte auth tag
+4. Encrypt the message using **AES-GCM** -> produces ciphertext + 16-byte auth tag
 5. Output: `base64(salt + nonce + ciphertext + tag)`
 
 **Why PBKDF2?** Raw passwords are weak keys. PBKDF2 stretches your password into a proper 256-bit key and makes brute-force attacks computationally expensive.
 
-**Why GCM?** GCM provides *authenticated encryption* — if anyone tampers with the ciphertext, decryption fails. You get both **confidentiality** and **integrity**.
+**Why GCM?** GCM provides *authenticated encryption* - if anyone tampers with the ciphertext, decryption fails. You get both **confidentiality** and **integrity**.
 
 ---
 
 ### RSA-2048 with OAEP (Asymmetric)
 
-RSA uses a mathematically linked key pair. What the public key encrypts, only the private key can decrypt — and vice versa.
+RSA uses a mathematically linked key pair. What the public key encrypts, only the private key can decrypt - and vice versa.
 
 | Parameter | Value |
 |-----------|-------|
@@ -304,15 +304,15 @@ A sequential, tamper-evident ledger for recording sensor readings.
 
 | Concept | Description |
 |---------|-------------|
-| **Salt** | Random data added to password before hashing — defeats rainbow table attacks |
-| **Nonce** | Used exactly once per encryption — ensures same message encrypts differently every time |
-| **PBKDF2** | Deliberately slow key derivation — makes brute-force attacks expensive |
+| **Salt** | Random data added to password before hashing - defeats rainbow table attacks |
+| **Nonce** | Used exactly once per encryption - ensures same message encrypts differently every time |
+| **PBKDF2** | Deliberately slow key derivation - makes brute-force attacks expensive |
 | **Authenticated Encryption** | GCM's auth tag detects any tampering with ciphertext |
 | **Public/Private Key Pair** | Foundation of all modern secure communication |
 | **Digital Signatures** | RSA-PSS proves message authenticity and detects tampering |
 | **PEM Format** | Standard text format for storing and sharing RSA keys |
 | **OAEP Padding** | Secure padding scheme that hardens RSA against known attacks |
-| **PSS Padding** | Probabilistic signature padding — more secure than PKCS#1 v1.5 |
+| **PSS Padding** | Probabilistic signature padding - more secure than PKCS#1 v1.5 |
 | **Entropy** | Measure of randomness/unpredictability in a password or key |
 
 ---
@@ -328,21 +328,21 @@ A sequential, tamper-evident ledger for recording sensor readings.
 
 ## ⚠️ Important Notes
 
-- **Never commit your `keys/` folder to GitHub** — your private key must stay private
-- RSA is limited to ~190 bytes per encryption with 2048-bit keys — use AES for large data
-- This project is for **educational use** — for production systems, use established libraries and follow security auditing practices
-- All cryptographic operations run **locally** — no data is sent anywhere
+- **Never commit your `keys/` folder to GitHub** - your private key must stay private
+- RSA is limited to ~190 bytes per encryption with 2048-bit keys - use AES for large data
+- This project is for **educational use** - for production systems, use established libraries and follow security auditing practices
+- All cryptographic operations run **locally** - no data is sent anywhere
 - See [SECURITY.md](SECURITY.md) for detailed security best practices
 
 ---
 
 ## 👤 Author
 
-Built by **[H8RSH100](https://github.com/H8rsh100)** — CS/IT Engineering Student  
+Built by **[H8RSH100](https://github.com/H8rsh100)** - CS/IT Engineering Student  
 Part of a cybersecurity portfolio series.
 
 ---
 
-## 📄 License
+## License
 
-MIT License — free to use, modify, and learn from.
+MIT - see LICENSE.
